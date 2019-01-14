@@ -94,7 +94,9 @@ function build_jar()
 function cleanup()
 {
   clean_src
-  docker rm -f $DOCKER_NAME
+  if [[ ("$COMMAND" = "linux") || ("$COMMAND" = "all") ]]; then
+    docker rm -f $DOCKER_NAME
+  fi
 }
 
 trap cleanup EXIT
