@@ -75,20 +75,18 @@ trait APIFeatureTest extends FeatureTest {
 
   private def cleanup(): Unit = {
     val directory = new ScalaPathResolver("").installDirectory
-    println(s"CLEAN UP ${directory.toString}")
-    for (f <- directory.listFiles()) {
-      if (f.isDirectory) {
-        deleteDirectory(f)
-      }
+    if (directory.exists()) {
+      directory.listFiles().filter(_.isDirectory).foreach(deleteDirectory)
     }
   }
 
   private def deleteDirectory(directory: File): Unit = {
     for (f <- directory.listFiles()) {
-      if (f.isDirectory)
+      if (f.isDirectory) {
         deleteDirectory(f)
-      else
+      } else {
         f.delete()
+      }
     }
     directory.delete()
   }
