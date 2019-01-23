@@ -38,7 +38,7 @@ class ApiClient(implicit val ec: ExecutionContext) {
 
   def getGasLimit(currencyName: String, recipient: String): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
-    val request = Request(Method.Get, s"/blockchain/v3/addresses/$recipient/estimate-gas-limit")
+    val request = Request(Method.Get, s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit")
       .host(host)
     service(request).map { response =>
       mapper.parse[GasLimit](response).limit
