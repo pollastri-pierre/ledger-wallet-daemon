@@ -19,6 +19,8 @@ import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
 import Wallet._
 import co.ledger.core.ConfigurationDefaults
+import co.ledger.wallet.daemon.libledger_core.database.JDBCDatabaseEngine
+import slick.jdbc.JdbcDataSource
 
 import scala.collection.JavaConverters._
 import scala.collection._
@@ -217,7 +219,7 @@ object Pool {
     new Pool(coreP, id)
   }
 
-  def newCoreInstance(poolDto: PoolDto): Future[core.WalletPool] = {
+  def newCoreInstance(source: JdbcDataSource, poolDto: PoolDto): Future[core.WalletPool] = {
     val poolConfig = core.DynamicObject.newInstance()
     //    poolConfig.putString("BLOCKCHAIN_OBSERVER_WS_ENDPOINT", "ws://notification.explorers.dev.aws.ledger.fr:9000/ws/{}")
     //    poolConfig.putString("BLOCKCHAIN_OBSERVER_ENGINE", "LEDGER_API")
@@ -231,6 +233,7 @@ object Pool {
       .setDatabaseBackend(core.DatabaseBackend.getSqlite3Backend)
       .setConfiguration(poolConfig)
       .setName(poolDto.name)
+      .setDatabaseBackend(core.DatabaseBackend.createBackendFromEngine(new JDBCDatabaseEngine(source)))
       .build()
   }
 

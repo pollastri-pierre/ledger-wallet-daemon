@@ -15,6 +15,7 @@ trait Tables {
   val profile: slick.jdbc.JdbcProfile
   import profile.api._
 
+
   class DatabaseVersion(tag: Tag) extends Table[(Int, Timestamp)](tag, "__database__") {
 
     def version   = column[Int]("version", O.PrimaryKey)

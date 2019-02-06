@@ -20,11 +20,10 @@ import scala.collection._
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class DefaultDaemonCache() extends DaemonCache with Logging {
+class DefaultDaemonCache extends DaemonCache with Logging {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   import DefaultDaemonCache._
-
 
   def dbMigration: Future[Unit] = {
     dbDao.migrate()
@@ -189,7 +188,7 @@ object DefaultDaemonCache extends Logging {
     private def toCacheAndStartListen(p: PoolDto, poolId: Long): Future[Pool] = {
       cachedPools.get(p.name) match {
         case Some(pool) => Future.successful(pool)
-        case None => Pool.newCoreInstance(p).flatMap { coreP =>
+        case None => Pool.newCoreInstance(dbDao.source, p).flatMap { coreP =>
           cachedPools.put(p.name, Pool.newInstance(coreP, poolId))
           debug(s"Add ${cachedPools(p.name)} to $self cache")
           cachedPools(p.name).registerEventReceiver(new NewOperationEventReceiver(poolId, opsCache))

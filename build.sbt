@@ -1,7 +1,7 @@
 name := "daemon"
 
 organization := "co.ledger"
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.7"
 
 enablePlugins(JavaServerAppPackaging)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
@@ -22,10 +22,11 @@ lazy val versions = new {
   val guice     = "4.0"
   val h2        = "1.4.192"
   val logback   = "1.1.7"
-  val postgre   = "9.3-1100-jdbc4"
+  val postgre   = "42.2.5"
   val slick     = "3.2.1"
   val sqlite    = "3.7.15-M1"
-  val cats = "1.5.0-RC1"
+  val cats      = "1.5.0-RC1"
+  val jsql      = "1.2"
 }
 
 libraryDependencies ++= Seq(
@@ -46,6 +47,8 @@ libraryDependencies ++= Seq(
 
   "com.twitter" %% "finatra-http"     % versions.finatra,
   "com.twitter" %% "finatra-jackson"  % versions.finatra,
+
+  "com.github.jsqlparser" % "jsqlparser" % versions.jsql,
 
   "com.twitter" %% "finatra-http"     % versions.finatra            % "test",
   "com.twitter" %% "finatra-jackson"  % versions.finatra            % "test",

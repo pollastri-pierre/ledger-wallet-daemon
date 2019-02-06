@@ -10,7 +10,7 @@ import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.inject.Logging
 import slick.jdbc.JdbcBackend.Database
-import slick.jdbc.TransactionIsolation
+import slick.jdbc.{JdbcDataSource, TransactionIsolation}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -20,6 +20,8 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
   import Tables.profile.api._
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   private val _writeContext: ExecutionContext = SerialExecutionContext.Implicits.global
+
+  val source: JdbcDataSource = db.source
 
   def migrate(): Future[Unit] = {
     implicit val ec: ExecutionContext = _writeContext

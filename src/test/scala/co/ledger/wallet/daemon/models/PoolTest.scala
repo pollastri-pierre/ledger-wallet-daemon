@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.models
 
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.utils.NativeLibLoader
 import org.junit.Test
@@ -12,10 +13,13 @@ import scala.concurrent.{Await, ExecutionContext}
 class PoolTest extends AssertionsForJUnit {
 
   NativeLibLoader.loadLibs()
+
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-  private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
+
+  private val db = DaemonConfiguration.dbProfile.backend.Database.forConfig(DaemonConfiguration.dbProfileName)
+  private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(db.source, new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
   private val notExistingWallet = Await.result(testPool.wallet("not_exist"), Duration.Inf)
-  private val samePool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
+  private lazy val samePool = Pool.newInstance(Await.result(Pool.newCoreInstance(db.source, new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
 
   private val wallet = Await.result(testPool.addWalletIfNotExist("test_wallet", "bitcoin").flatMap { testWallet =>
     testPool.wallet("test_wallet").flatMap { sameWallet =>

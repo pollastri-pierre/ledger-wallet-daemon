@@ -10,6 +10,7 @@ import org.scalatest.junit.AssertionsForJUnit
 import co.ledger.core
 import Currency.RichCoreCurrency
 import Wallet.RichCoreWallet
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.utils.NativeLibLoader
 
 import scala.concurrent.duration.Duration
@@ -26,7 +27,8 @@ class WalletTest extends AssertionsForJUnit {
     "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71",
     "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb")
 
-  private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto(UUID.randomUUID().toString, 2L, "", Option(0L))), Duration.Inf), 1L)
+  private val db = DaemonConfiguration.dbProfile.backend.Database.forConfig(DaemonConfiguration.dbProfileName)
+  private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(db.source, new PoolDto(UUID.randomUUID().toString, 2L, "", Option(0L))), Duration.Inf), 1L)
 
   private val testWallet = Await.result(testPool.addWalletIfNotExist("test_wallet", "bitcoin"), Duration.Inf)
 
@@ -64,7 +66,6 @@ class WalletTest extends AssertionsForJUnit {
     }.flatMap { info => testWallet.addAccountIfNotExist(info) } , Duration.Inf)
 
   @Test def verifyWalletActivities(): Unit = {
-    println("first lime in test")
     val accounts = Await.result(testWallet.accounts, Duration.Inf)
     assert(3 === accounts.size)
     assert(testAccount.getIndex === accounts.head.getIndex)
