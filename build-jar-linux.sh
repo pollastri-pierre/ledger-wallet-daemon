@@ -12,5 +12,5 @@ apt update
 apt install -y openjdk-8-jdk
 
 cd $LINUX_BUILD_DIR
-cmake -DTARGET_JNI=ON $LINUX_SRC_DIR
-make -j 8
+cmake -DTARGET_JNI=ON -DBUILD_TESTS=OFF $LINUX_SRC_DIR
+make
