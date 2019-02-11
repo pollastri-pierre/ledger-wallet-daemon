@@ -52,6 +52,14 @@ trait APIFeatureTest extends FeatureTest {
     server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts", accountCreationBody, headers = defaultHeaders, andExpect = expected)
   }
 
+  def getOperation(poolName: String, walletName: String, accountIndex: Int): Any = {
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/operations", headers = defaultHeaders).contentString
+  }
+
+  def getFreshAddress(poolName: String, walletName: String, accountIndex: Int): Unit = {
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/addresses/fresh", headers = defaultHeaders).contentString
+  }
+
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
     val ecdsa = server.injector.instance(classOf[ECDSAService])
     val privKey = Sha256Hash.hash(FixturesUtils.seed(seedName).getBytes)
