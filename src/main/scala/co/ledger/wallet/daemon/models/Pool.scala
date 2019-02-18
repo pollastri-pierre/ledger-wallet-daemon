@@ -105,6 +105,11 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
   }
 
   def addWalletIfNotExist(walletName: String, currencyName: String): Future[core.Wallet] = {
+    coreP.getCurrencies().foreach({currencies =>
+      println("GOT CURRENCIES")
+      currencies.asScala.foreach(c => println(c.getName))
+      println("\\GOT CURRENCIES")
+    })
     coreP.getCurrency(currencyName).flatMap { coreC =>
       val walletConfig = core.DynamicObject.newInstance()
       val apiUrl = DaemonConfiguration.explorer.api.paths.get(coreC.getName) match {

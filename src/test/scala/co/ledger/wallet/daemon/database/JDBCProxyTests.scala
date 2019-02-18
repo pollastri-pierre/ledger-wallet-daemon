@@ -13,7 +13,7 @@ import com.twitter.finagle.http.Status
   */
 class JDBCProxyTests extends APIFeatureTest {
 
-  val PoolName = "jdbc_tests1"
+  val PoolName = "jdbc_tests2"
   private val AccountBody =
     """{""" +
       """"account_index": 0,""" +

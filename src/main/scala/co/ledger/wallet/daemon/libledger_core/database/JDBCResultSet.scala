@@ -48,7 +48,6 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
           val rs = statement.getResultSet
           println(s"On execution ${rs.isBeforeFirst()} ${rs.isFirst()} ${rs.isLast()} ${rs.isAfterLast()}")
           val isEmpty = !rs.isBeforeFirst
-          rs.next()
           QueryResultSet(rs, isEmpty, new JDBCDatabaseResultRow(rs, 1))
         case _ =>
           UpdateResultSet(statement.getUpdateCount)
@@ -66,12 +65,15 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
     println(s"Available ${available()}")
     println(s"Position $empty ${set.isBeforeFirst()} ${set.isFirst()} ${set.isLast()} ${set.isAfterLast()}")
     println(s"Cols ${set}")
+    println(s"hasNext $hasNext")
 
     override def getRow: DatabaseResultRow = if (!set.isAfterLast && !empty) row else null
 
     override def available(): Int = {
       if (!set.isAfterLast && !set.isLast && !empty) 1 else 0
     }
+
+    override def hasNext: Boolean = available() > 0
 
     override def next(): Unit = {
       if (!hasNext) throw new RuntimeException("Attempt to call next on a final cursor")
