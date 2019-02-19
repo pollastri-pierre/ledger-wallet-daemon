@@ -14,7 +14,6 @@ import co.ledger.core.{DatabaseBlob, DatabaseResultRow}
   */
 class JDBCDatabaseResultRow(set: ResultSet, val rowNumber: Int) extends DatabaseResultRow {
   override def isNullAtPos(i: Int): Boolean = {
-    println(s"CHECK NULL ${i +1}")
     set.getObject(i + 1)
     set.wasNull()
   }
@@ -31,16 +30,7 @@ class JDBCDatabaseResultRow(set: ResultSet, val rowNumber: Int) extends Database
 
   override def getLongByPos(i: Int): Long = row.getLong(i + 1)
 
-  override def getStringByPos(i: Int): String = {
-    try {
-      println(s"GETTING STRING ${i +1}")
-      row.getString(i + 1)
-    } catch {
-      case all: Throwable =>
-        all.printStackTrace()
-        throw all
-    }
-  }
+  override def getStringByPos(i: Int): String = row.getString(i + 1)
 
   override def getBlobByPos(i: Int): DatabaseBlob = new JDBCDatabaseBlob(row.getBlob(i))
 

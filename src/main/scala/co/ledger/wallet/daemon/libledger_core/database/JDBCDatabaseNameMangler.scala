@@ -32,7 +32,6 @@ class JDBCDatabaseNameMangler(prefix: String) {
   private def mangle(query: String, tables: List[String]): String = tables match {
     case Nil => query
     case head :: tail =>
-      println(s"Replace $head with ${normalizedPrefix}_$head ")
       mangle(query.replaceAll(s" $head", s" ${normalizedPrefix}_$head"), tail)
   }
 

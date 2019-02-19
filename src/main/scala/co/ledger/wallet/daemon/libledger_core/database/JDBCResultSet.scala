@@ -46,7 +46,6 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
       queryType match {
         case JDBCSelectQueryType =>
           val rs = statement.getResultSet
-          println(s"On execution ${rs.isBeforeFirst()} ${rs.isFirst()} ${rs.isLast()} ${rs.isAfterLast()}")
           val isEmpty = !rs.isBeforeFirst
           QueryResultSet(rs, isEmpty, new JDBCDatabaseResultRow(rs, 1))
         case _ =>
@@ -62,10 +61,6 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
   sealed trait UnifiedResultSet extends RichDatabaseResultSet
 
   private case class QueryResultSet(var set: ResultSet, empty: Boolean, var row: JDBCDatabaseResultRow) extends UnifiedResultSet {
-    println(s"Available ${available()}")
-    println(s"Position $empty ${set.isBeforeFirst()} ${set.isFirst()} ${set.isLast()} ${set.isAfterLast()}")
-    println(s"Cols ${set}")
-    println(s"hasNext $hasNext")
 
     override def getRow: DatabaseResultRow = if (!set.isAfterLast && !empty) row else null
 
@@ -77,7 +72,6 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
 
     override def next(): Unit = {
       if (!hasNext) throw new RuntimeException("Attempt to call next on a final cursor")
-      println("CALLING NEXT ON RESULT SET")
       set.next()
       row = new JDBCDatabaseResultRow(set, set.getRow)
     }
@@ -93,7 +87,6 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
     }
     override def getColumnCount: Int = set.getMetaData.getColumnCount
 
-    println(s"NUMBER OF COLS $getColumnCount")
   }
 
   private case class EmptyResultSet() extends UnifiedResultSet {

@@ -66,7 +66,6 @@ class JDBCDatabaseStatement(query: String, connection: JDBCDatabaseConnection) e
 
   private def prepareStatement(): PreparedStatement = {
     try {
-      println(s"Prepare statement ${_queryString}")
       connection.connection.prepareStatement(_queryString)
     } catch {
       case all: Throwable =>

@@ -13,7 +13,6 @@ import co.ledger.core.{DatabaseBlob, DatabaseConnection, DatabaseStatement}
   *
   */
 class JDBCDatabaseConnection(val connection: Connection, val databaseName: String) extends DatabaseConnection {
-  println(s"Acquire connection ${connection.hashCode()} on  $databaseName")
 
   override def prepareStatement(query: String, repeatable: Boolean): DatabaseStatement =
     new JDBCDatabaseStatement(query,this)
@@ -25,7 +24,6 @@ class JDBCDatabaseConnection(val connection: Connection, val databaseName: Strin
   override def commit(): Unit = () //connection.commit()
 
   override def close(): Unit = {
-    println(s"Connection close ${connection.hashCode()} on $databaseName")
     try {
       connection.close()
     } catch {
