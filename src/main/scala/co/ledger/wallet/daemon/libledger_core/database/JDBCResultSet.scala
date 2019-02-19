@@ -61,7 +61,6 @@ class JDBCResultSet(statement: PreparedStatement, queryType: JDBCQueryType) exte
   sealed trait UnifiedResultSet extends RichDatabaseResultSet
 
   private case class QueryResultSet(var set: ResultSet, empty: Boolean, var row: JDBCDatabaseResultRow) extends UnifiedResultSet {
-
     override def getRow: DatabaseResultRow = if (!set.isAfterLast && !empty) row else null
 
     override def available(): Int = {
