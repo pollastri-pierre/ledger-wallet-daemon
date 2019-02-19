@@ -1,12 +1,9 @@
 package co.ledger.wallet.daemon.clients
 
-import java.net.InetSocketAddress
-
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.models.FeeMethod
 import co.ledger.wallet.daemon.utils.Utils._
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.twitter.finagle.client.Transporter
 import com.twitter.finagle.http.{Method, Request, Response}
 import com.twitter.finagle.{Http, Service}
 import com.twitter.finatra.json.FinatraObjectMapper
@@ -38,7 +35,7 @@ class ApiClient(implicit val ec: ExecutionContext) {
 
   def getGasLimit(currencyName: String, recipient: String): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
-    val request = Request(Method.Get, s"/blockchain/v3/addresses/$recipient/estimate-gas-limit")
+    val request = Request(Method.Get, s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit")
       .host(host)
     service(request).map { response =>
       mapper.parse[GasLimit](response).limit
@@ -56,22 +53,17 @@ class ApiClient(implicit val ec: ExecutionContext) {
   }
 
   private val mapper: FinatraObjectMapper = FinatraObjectMapper.create()
-  private val client = {
-    DaemonConfiguration.proxy match {
-      case None =>
-        Http.client
-          .withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
-      case Some(proxy) =>
-        Http.client
-          .withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
-          .configured(Transporter.HttpProxy(Some(new InetSocketAddress(proxy.host, proxy.port)), None))
-    }
-  }
+  private val client = Http.client.withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
   private val services: Map[String,(String, Service[Request, Response])] =
     DaemonConfiguration.explorer.api.paths
       .map { case(currency, path) =>
         val p = path.filterPrefix
-        currency -> (p.host, client.newService(s"${p.host}:${p.port}"))
+        currency -> (p.host, {
+          DaemonConfiguration.proxy match {
+            case Some(proxy) => client.withTransport.httpProxyTo(s"${p.host}:${p.port}").newService(s"${proxy.host}:${proxy.port}")
+            case None => client.newService(s"${p.host}:${p.port}")
+          }
+        })
       }
 
   private val paths: Map[String, String] = {
@@ -93,6 +85,7 @@ class ApiClient(implicit val ec: ExecutionContext) {
       "bitcoin_gold" -> "/blockchain/v2/btg/fees",
       "zcash" -> "/blockchain/v2/zec/fees",
       "ethereum" -> "/blockchain/v3/fees",
+      "ethereum_classic" -> "/blockchain/v3/fees",
       "ethereum_ropsten" -> "/blockchain/v3/fees",
     )
   }
