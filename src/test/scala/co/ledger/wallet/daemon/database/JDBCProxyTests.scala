@@ -38,9 +38,10 @@ class JDBCProxyTests extends APIFeatureTest {
     assertWalletCreation(PoolName, "wallet", "bitcoin", Status.Ok)
     assertCreateAccount(AccountBody, PoolName, "wallet", Status.Ok)
     assertSyncPool(Status.Ok)
-    getFreshAddress(PoolName, "wallet", 0)
-    val ops: Any = getOperation(PoolName, "wallet", 0)
-    println(ops.toString)
+    val addrs = getFreshAddress(PoolName, "wallet", 0)
+    val ops = getOperation(PoolName, "wallet", 0)
+    assert(ops.operations.nonEmpty)
+    assert(addrs.nonEmpty)
   }
 
 }

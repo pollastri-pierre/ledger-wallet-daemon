@@ -1,11 +1,13 @@
 package co.ledger.wallet.daemon.utils
 
 import java.io.File
-import java.util.Date
+import java.util.{Date, UUID}
 
-import co.ledger.wallet.daemon.ServerImpl
+import co.ledger.core
+import co.ledger.wallet.daemon.{ServerImpl, models}
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.services.ECDSAService
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.{Response, Status}
 import com.twitter.finatra.http.EmbeddedHttpServer
@@ -52,12 +54,18 @@ trait APIFeatureTest extends FeatureTest {
     server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts", accountCreationBody, headers = defaultHeaders, andExpect = expected)
   }
 
-  def getOperation(poolName: String, walletName: String, accountIndex: Int): Any = {
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/operations", headers = defaultHeaders).contentString
+  def getOperation(poolName: String, walletName: String, accountIndex: Int): APIFeatureTest.PackedOperationsView = {
+   parse[APIFeatureTest.PackedOperationsView](server.httpGet(
+     s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/operations",
+     headers = defaultHeaders
+   ))
   }
 
-  def getFreshAddress(poolName: String, walletName: String, accountIndex: Int): Unit = {
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/addresses/fresh", headers = defaultHeaders).contentString
+  def getFreshAddress(poolName: String, walletName: String, accountIndex: Int): List[models.FreshAddressView] = {
+    parse[List[models.FreshAddressView]](
+      server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accountIndex/addresses/fresh",
+        headers = defaultHeaders
+      ))
   }
 
   private def lwdBasicAuthorisationHeader(seedName: String, time: Date = new Date()) = {
@@ -99,4 +107,36 @@ trait APIFeatureTest extends FeatureTest {
     directory.delete()
   }
 
+}
+
+object APIFeatureTest {
+  case class OperationView(
+                            @JsonProperty("uid") uid: String,
+                            @JsonProperty("currency_name") currencyName: String,
+                            @JsonProperty("currency_family") currencyFamily: core.WalletType,
+                            @JsonProperty("trust") trust: Option[TrustIndicatorView],
+                            @JsonProperty("confirmations") confirmations: Long,
+                            @JsonProperty("time") time: Date,
+                            @JsonProperty("block_height") blockHeight: Option[Long],
+                            @JsonProperty("type") opType: core.OperationType,
+                            @JsonProperty("amount") amount: BigInt,
+                            @JsonProperty("fees") fees: BigInt,
+                            @JsonProperty("wallet_name") walletName: String,
+                            @JsonProperty("account_index") accountIndex: Int,
+                            @JsonProperty("senders") senders: Seq[String],
+                            @JsonProperty("recipients") recipients: Seq[String],
+                          )
+
+  case class TrustIndicatorView(
+                                 @JsonProperty("weight") weight: Int,
+                                 @JsonProperty("level") level: core.TrustLevel,
+                                 @JsonProperty("conflicted_operations") conflictedOps: Seq[String],
+                                 @JsonProperty("origin") origin: String
+                               )
+
+  case class PackedOperationsView(
+                                   @JsonProperty("previous") previous: Option[UUID],
+                                   @JsonProperty("next") next: Option[UUID],
+                                   @JsonProperty("operations") operations: Seq[OperationView]
+                                 )
 }

@@ -17,11 +17,11 @@ class JDBCDatabaseConnection(val connection: Connection, val databaseName: Strin
   override def prepareStatement(query: String, repeatable: Boolean): DatabaseStatement =
     new JDBCDatabaseStatement(query,this)
 
-  override def begin(): Unit = ()// connection.setAutoCommit(false)
+  override def begin(): Unit = connection.setAutoCommit(false)
 
-  override def rollback(): Unit = () // connection.rollback()
+  override def rollback(): Unit = connection.rollback()
 
-  override def commit(): Unit = () //connection.commit()
+  override def commit(): Unit = connection.commit()
 
   override def close(): Unit = {
     try {
