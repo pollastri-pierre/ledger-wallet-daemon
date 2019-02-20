@@ -48,3 +48,8 @@ Prerequisites: [docker](https://www.docker.com/get-started) and [sbt](https://ww
 
 6. Add a tag on the new commit with the version of the ledger-core-lib, or the commit
 hash if no version was tagged
+
+## Configuring the daemon when running on Docker
+
+An example file of env file is available under `sample/docker.env`. You can then write your env file and use it to configure
+the daemon.

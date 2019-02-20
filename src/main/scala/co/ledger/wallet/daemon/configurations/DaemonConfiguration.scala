@@ -48,8 +48,7 @@ object DaemonConfiguration {
     if (config.hasPath("authentication.token_duration")) { config.getInt("authentication.token_duration_in_seconds") * 1000 }
     else { DEFAULT_AUTH_TOKEN_DURATION }
 
-  val dbProfileName: String = Try(config.getString("database_engine")).toOption.getOrElse("sqlite3")
-
+  val dbProfileName: String = Try(config.getString("database_engine")).getOrElse(throw new  Exception("Missing ENV variable: WALLET_DB_PROFILE"))
   val dbProfile: JdbcProfile = dbProfileName match {
     case "sqlite3" =>
       slick.jdbc.SQLiteProfile

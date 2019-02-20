@@ -13,6 +13,8 @@ workflows:
       - docker/test_image:
           requires:
             - docker/build_image
+          dgoss_docker_env_vars: |-
+            WALLET_DB_PROFILE=h2mem1
           filters:
             tags:
               only: /v.*/
