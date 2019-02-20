@@ -29,6 +29,7 @@ workflows:
               only:
                 - master
                 - develop
+                - develop-drop2
                 - release_candidate
             tags:
               only: /v.*/
