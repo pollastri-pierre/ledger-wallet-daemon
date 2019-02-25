@@ -50,9 +50,9 @@ object DaemonConfiguration {
 
   val dbProfileName: String = Try(config.getString("database_engine")).getOrElse(throw new  Exception("Missing ENV variable: WALLET_DB_PROFILE"))
   val dbProfile: JdbcProfile = dbProfileName match {
-    case "sqlite3" =>
+    case "sqlite" =>
       slick.jdbc.SQLiteProfile
-    case "postgres" =>
+    case "postgresql" =>
       slick.jdbc.PostgresProfile
     case "h2mem1" =>
       slick.jdbc.H2Profile
