@@ -1,15 +1,17 @@
 # ledger-wallet-daemon &middot; [![CircleCI](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon.svg?style=shield)](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon)
 
-
 ## Updating the libcore
 
 When a new version of the libcore is available, we need to update our bindings.
 
-Prerequisites: [docker](https://www.docker.com/get-started) and [sbt](https://www.scala-sbt.org/download.html) installed
+| Prerequisite                                   | Remarks |
+| ============================================== | ========================================= |
+| [docker](https://www.docker.com/get-started)   | Only needed if you plan to build in local |
+| [sbt](https://www.scala-sbt.org/download.html) |                                           |
 
 1. Check out [lib core project](https://github.com/LedgerHQ/lib-ledger-core)
    ```bash
-   git clone --recurse-submodules https://github.com/LedgerHQ/lib-ledger-core
+   git clone --recurse-submodules --depth 1 --branch <branch_or_version_tag> https://github.com/LedgerHQ/lib-ledger-core
    ```
 
 2. Copy `build-jar.sh` and `build-jar-linux.sh` to the lib core project folder
@@ -23,28 +25,40 @@ Prerequisites: [docker](https://www.docker.com/get-started) and [sbt](https://ww
    cd $LIB_CORE_FOLDER
    ```
 
-4. Run the script `build-jar.sh` with command: `mac`, `linux` or `all`.
-   MacOS can build both `mac` and `linux`. Linux can only build `linux`.
-   ```bash
-   # Build for both mac only. You may want to do this when developing, 
-   # it's much faster than build for both mac and linux
-   bash build-jar.sh mac
+4. Two possible situations: either you want a fresh build from your local machine, or you want to
+   grab the official lib core artifacts.
+   1. For building on your machine, run the script `build-jar.sh` with command: `mac`, `linux` or `all`.
+      MacOS can build both `mac` and `linux`. Linux can only build `linux`.
+      ```bash
+      # Build for mac only. You may want to do this when developing,
+      # it's much faster than build for both mac and linux
+      bash build-jar.sh mac
 
-   # Build for linux. Linux build is using docker.
-   bash build-jar.sh all
+      # Build for linux. Linux build is using docker.
+      bash build-jar.sh linux
 
-   # Build for both mac and linux
-   bash build-jar.sh all
+      # Build for both mac and linux
+      bash build-jar.sh all
+      ```
+   2. For getting the official release, pass an extra argument `dl` to the command invocation.
+      ```bash
+      # Get only the mac release artifacts.
+      ./build-jar.sh mac dl
 
-   ```
+      # Get only the linux artifacts.
+      ./build-jar.sh linux dl
 
-5. After the build, you find the jar file in `$LIB_CORE_FOLDER/../build-jar/target/scala-<version>/build-jar-<version>.jar`.
+      # Get both.
+      ./build-jar.sh all dl
+      ```
+
+5. Then, you find the jar file in `$LIB_CORE_FOLDER/../build-jar/target/scala-<version>/build-jar-<version>.jar`.
    Replace the `ledger-lib-core.jar` in the lib folder with this file.
    ```bash
    mv $LIB_CORE_FOLDER/../build-jar/target/scala-<version>/build-jar-<version>.jar $WALLET_DAEMON_FOLDER/lib/ledger-lib-core.jar
    ```
 
-5. Push the changes to upstream
+6. Push the changes to upstream
 
-6. Add a tag on the new commit with the version of the ledger-core-lib, or the commit
-hash if no version was tagged
+7. Add a tag on the new commit with the version of the ledger-core-lib, or the commit
+   hash if no version was tagged

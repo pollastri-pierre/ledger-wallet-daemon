@@ -11,12 +11,16 @@ set -eo pipefail
 
 CURRENT_DIR=$PWD
 COMMAND=$1
+OPT_COMMAND=$2
 
 DOCKER_NAME=lib-core-cmake
 INTERFACE_GEN_DIR=$CURRENT_DIR/tools/generate_interfaces.sh
 MACOS_BUILD_DIR=$CURRENT_DIR/../lib-ledger-core-build
 LINUX_BUILD_DIR=$CURRENT_DIR/../lib-ledger-core-build-linux
 JAR_BUILD_DIR=$CURRENT_DIR/../build-jar
+LIBCORE_AWS_URL_BASE="https://s3-eu-west-1.amazonaws.com/ledger-lib-ledger-core"
+LIBCORE_VERSION="2.7.0-rc-f9588a"
+LIBCORE_DL_DIR=$CURRENT_DIR/../lib-ledger-core-dl
 
 function gen_interface()
 {
@@ -59,6 +63,38 @@ function build_so()
     bash $DOCKER_BUILD_SCRIPT
 }
 
+# Grab a version of libcore.
+function dl_libcore()
+{
+  local platform="$1"
+  local input_file_name="$2"
+  local output_file_name="$3"
+  local url="$LIBCORE_AWS_URL_BASE/$LIBCORE_VERSION/$platform/$input_file_name"
+
+  echo "Downloading libcore-$LIBCORE_VERSION for $platform"
+
+  mkdir -p $LIBCORE_DL_DIR
+  if ! curl \
+    --fail \
+    --max-time 600 \
+    --output $LIBCORE_DL_DIR/$output_file_name \
+    "$url"; then
+    echo "Cannot download $url"
+    exit 1
+  fi
+}
+
+# Grab the dylib (macOSX) version of libcore from AWS S3.
+function dl_dylib()
+{
+  dl_libcore "macos/jni" "libledger-core_jni.dylib" "libledger-core.dylib"
+}
+
+# Grab the so (linux) version of libcore from AWS S3.
+function dl_so() {
+  dl_libcore "linux/jni" "libledger-core_jni.so" "libledger-core.so"
+}
+
 # Build jar
 function build_jar()
 {
@@ -75,14 +111,26 @@ function build_jar()
   cp -v $SCALA_API_DIR/* $JAR_BUILD_DIR
 
   if [ "$COMMAND" = "mac" ]; then
-    cp -v $MACOS_BUILD_DIR/core/src/libledger-core.dylib $RESOURCE_DIR
+    if [ "$OPT_COMMAND" == "dl" ]; then
+      cp -v $LIBCORE_DL_DIR/libledger-core.dylib $RESOURCE_DIR
+    else
+      cp -v $MACOS_BUILD_DIR/core/src/libledger-core.dylib $RESOURCE_DIR
+    fi
   elif [ "$COMMAND" = "linux" ]
   then
-    docker cp $DOCKER_NAME:$DOCKER_BUILD_DIR/core/src/libledger-core.so $RESOURCE_DIR
+    if [ "$OPT_COMMAND" == "dl" ]; then
+      cp -v $LIBCORE_DL_DIR/libledger-core.so $RESOURCE_DIR
+    else
+      docker cp $DOCKER_NAME:$DOCKER_BUILD_DIR/core/src/libledger-core.so $RESOURCE_DIR
+    fi
   elif [ "$COMMAND" = "all" ]
   then
-    cp -v $MACOS_BUILD_DIR/core/src/libledger-core.dylib $RESOURCE_DIR
-    docker cp $DOCKER_NAME:$DOCKER_BUILD_DIR/core/src/libledger-core.so $RESOURCE_DIR
+    if [ "$OPT_COMMAND" == "dl" ]; then
+      cp -v $LIBCORE_DL_DIR/libledger-core.{so,dylib} $RESOURCE_DIR
+    else
+      cp -v $MACOS_BUILD_DIR/core/src/libledger-core.dylib $RESOURCE_DIR
+      docker cp $DOCKER_NAME:$DOCKER_BUILD_DIR/core/src/libledger-core.so $RESOURCE_DIR
+    fi
   fi
 
   cd $JAR_BUILD_DIR
@@ -94,22 +142,41 @@ function build_jar()
 function cleanup()
 {
   clean_src
-  docker rm -f $DOCKER_NAME
+
+  if [ "$OPT_COMMAND" != "dl" ]; then
+    docker rm -f $DOCKER_NAME
+  fi
 }
 
 trap cleanup EXIT
 
 if [ "$COMMAND" = "mac" ]; then
-  build_dylib
+  if [ "$OPT_COMMAND" = "dl" ]; then
+    dl_dylib
+  else
+    build_dylib
+  fi
+
   build_jar
 elif [ "$COMMAND" = "linux" ]
 then
-  build_so
+  if [ "$OPT_COMMAND" = "dl" ]; then
+    dl_so
+  else
+    build_so
+  fi
+
   build_jar
 elif [ "$COMMAND" = "all" ]
 then
-  build_dylib
-  build_so
+  if [ "$OPT_COMMAND" = "dl" ]; then
+    dl_dylib
+    dl_so
+  else
+    build_dylib
+    build_so
+  fi
+
   build_jar
 else
   echo "commands:"
