@@ -8,6 +8,7 @@ import co.ledger.wallet.daemon.models._
 import Currency._
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 @Singleton
 class CurrenciesService @Inject()(daemonCache: DaemonCache) extends DaemonService {
@@ -18,7 +19,9 @@ class CurrenciesService @Inject()(daemonCache: DaemonCache) extends DaemonServic
   }
 
   def currencies(poolInfo: PoolInfo): Future[Seq[CurrencyView]] = {
-    daemonCache.getCurrencies(poolInfo).map { modelCs => modelCs.map(_.currencyView) }
+    daemonCache.getCurrencies(poolInfo).map { modelCs =>
+      modelCs.flatMap(c => Try(c.currencyView).toOption)
+    }
   }
 
   def validateAddress(address: String, currencyName: String, poolInfo: PoolInfo): Future[Boolean] = {

@@ -39,8 +39,13 @@ case class WalletPoolAlreadyExistException(poolName: String) extends {
 } with Exception(msg) with DaemonException
 
 case class CurrencyNotFoundException(currencyName: String) extends {
-  val msg = s"Currency $currencyName is not supported"
+  val msg = s"Currency $currencyName is not found"
   val code = ErrorCodes.CURRENCY_NOT_FOUND
+} with Exception(msg) with DaemonException
+
+case class CurrencyNotSupportedException(currencyName: String) extends {
+  val msg = s"Currency $currencyName is not supported"
+  val code = ErrorCodes.CURRENCY_NOT_SUPPORTED
 } with Exception(msg) with DaemonException
 
 case class UserNotFoundException(pubKey: String) extends {
@@ -84,6 +89,7 @@ object ErrorCodes {
   val CURRENCY_NOT_FOUND = 206
   val USER_NOT_FOUND = 207
   val USER_ALREADY_EXIST = 208
+  val CURRENCY_NOT_SUPPORTED = 209
   val CORE_BAD_REQUEST = 301
   val DAEMON_DATABASE_EXCEPTION = 302
 }
