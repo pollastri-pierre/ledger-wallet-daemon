@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.models
 
 import co.ledger.core
+import co.ledger.wallet.daemon.exceptions.CurrencyNotSupportedException
 import co.ledger.wallet.daemon.models.coins.Coin.NetworkParamsView
 import co.ledger.wallet.daemon.models.coins.{Bitcoin, EthereumNetworkParamView}
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -53,7 +54,7 @@ object Currency {
   private def newNetworkParamsView(coreCurrency: core.Currency): NetworkParamsView = coreCurrency.getWalletType match {
     case core.WalletType.BITCOIN => Bitcoin.newNetworkParamsView(coreCurrency.getBitcoinLikeNetworkParameters)
     case core.WalletType.ETHEREUM => EthereumNetworkParamView(coreCurrency.getEthereumLikeNetworkParameters)
-    case _ => throw new UnsupportedOperationException
+    case _ => throw CurrencyNotSupportedException(coreCurrency.getName)
   }
 }
 

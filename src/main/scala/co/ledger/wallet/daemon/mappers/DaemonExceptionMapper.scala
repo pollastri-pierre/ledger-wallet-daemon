@@ -42,6 +42,10 @@ class DaemonExceptionMapper @Inject()(response: ResponseBuilder)
         ResponseSerializer.serializeBadRequest(
           daemonExceptionInfo(cnfe) + ("currency_name" -> cnfe.currencyName),
           response)
+      case cnfe: CurrencyNotSupportedException =>
+        ResponseSerializer.serializeBadRequest(
+          daemonExceptionInfo(cnfe) + ("currency_name" -> cnfe.currencyName),
+          response)
       case unfe: UserNotFoundException =>
         ResponseSerializer.serializeBadRequest(
           daemonExceptionInfo(unfe) + ("pub_key" -> unfe.pubKey),
