@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.controllers
 
-import java.util.{Date, UUID}
+import java.util.{Date, UUID, ArrayList}
 
 import co.ledger.core.{OperationType, TimePeriod}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
@@ -19,6 +19,7 @@ import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 import javax.inject.Inject
+
 
 import scala.concurrent.ExecutionContext
 
@@ -168,6 +169,12 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         accountsService.getTokenAccount(request.tokenAccountInfo)
       }
 
+      // Return the balances and operation counts history of token accounts in the order of the starting time to the end time.
+      get("/tokens/:token_address/history") { request: TokenHistoryRequest =>
+        info(s"Get history $request")
+        accountsService.getTokenCoreAccountBalanceHistory(request.tokenAccountInfo, request.startDate, request.endDate, request.timePeriod).map(TokenHistoryResponse(_))
+      }
+
       // given token address, get the operations on this token
       get("/tokens/:token_address/operations") { request: TokenAccountRequest =>
         accountsService.getERC20Operations(request.tokenAccountInfo)
@@ -202,6 +209,8 @@ object AccountsController {
 
   case class HistoryResponse(balances: List[BigInt], operationCounts: List[Map[OperationType, Int]])
 
+  case class TokenHistoryResponse(balances: ArrayList[co.ledger.core.BigInt])
+
   case class HistoryRequest(
                              @RouteParam override val pool_name: String,
                              @RouteParam override val wallet_name: String,
@@ -210,6 +219,27 @@ object AccountsController {
                              request: Request
                            ) extends BaseSingleAccountRequest {
 
+    def timePeriod: TimePeriod = TimePeriod.valueOf(timeInterval)
+
+    def startDate: Date = DATE_FORMATTER.parse(start)
+
+    def endDate: Date = DATE_FORMATTER.parse(end)
+
+    @MethodValidation
+    def validateDate: ValidationResult = CommonMethodValidations.validateDates(start, end)
+
+    @MethodValidation
+    def validateTimePeriod: ValidationResult = CommonMethodValidations.validateTimePeriod(timeInterval)
+  }
+
+  case class TokenHistoryRequest (
+                            @RouteParam override val pool_name: String,
+                            @RouteParam override val wallet_name: String,
+                            @RouteParam override val account_index: Int,
+                            @RouteParam override val token_address: String,
+                            @QueryParam start: String, @QueryParam end: String, @QueryParam timeInterval: String,
+                            request: Request
+                            ) extends BaseSingleAccountRequest with WithTokenAccountInfo {
     def timePeriod: TimePeriod = TimePeriod.valueOf(timeInterval)
 
     def startDate: Date = DATE_FORMATTER.parse(start)
@@ -285,6 +315,7 @@ object AccountsController {
                              @QueryParam contract: Option[String],
                              request: Request
                            ) extends BaseSingleAccountRequest
+
 
   case class OperationRequest(
                                @RouteParam override val pool_name: String,
