@@ -81,25 +81,35 @@ explorer = {
       }
       {
         currency = ethereum
-        host = "http://eth-mainnet.explorers.prod.aws.ledger.fr"
+        host = "http://eth-mainnet.explorers.dev.aws.ledger.fr"
+        host = ${?WALLET_ETH_EXPLORER_ENDPOINT}
         port = 80
+        port = ${?WALLET_ETH_EXPLORER_PORT}
       }
       {
         currency = ethereum_classic
-        host = "http://eth-classic.explorers.prod.aws.ledger.fr"
+        host = "http://eth-classic.explorers.dev.aws.ledger.fr"
+        host = ${?WALLET_ETC_EXPLORER_ENDPOINT}
         port = 80
+        port = ${?WALLET_ETC_EXPLORER_PORT}
       }
       {
         currency = ethereum_ropsten
-        host = "http://eth-ropsten.explorers.prod.aws.ledger.fr"
+        host = "http://eth-ropsten.explorers.dev.aws.ledger.fr"
+        host = ${?WALLET_ETH_ROPSTEN_EXPLORER_ENDPOINT}
         port = 80
+        port = ${?WALLET_ETH_ROPSTEN_EXPLORER_PORT}
       }
     ]
   }
   ws = {
     default = "wss://ws.ledgerwallet.com/blockchain/v2/{}/ws"
+    default = ${?WALLET_DEFAULT_WS_ENDPOINT}
     ethereum = "ws://notification.explorers.dev.aws.ledger.fr:9000/ws/{}"
+    ethereum = ${?WALLET_ETH_WS_ENDPOINT}
     ethereum_classic = "ws://notification.explorers.dev.aws.ledger.fr:9000/ws/{}"
+    ethereum_classic = ${?WALLET_ETC_WS_ENDPOINT}
     ethereum_ropsten = "ws://notification.explorers.dev.aws.ledger.fr:9000/ws/{}"
+    ethereum_ropsten = ${?WALLET_ETH_ROPSTEN_WS_ENDPOINT}
   }
 }
