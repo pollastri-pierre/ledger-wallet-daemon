@@ -53,6 +53,29 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
     }
   }
 
+  /**
+    * Obtain ALL wallets.
+    *
+    * @return a sequence of wallet
+    */
+  def wallets: Future[Seq[core.Wallet]] = {
+    coreP.getWalletCount().flatMap { count =>
+      val batch = 20
+      def walletsFromOffset(offset: Int): Future[List[core.Wallet]] = {
+        val size = Math.min(batch, count - offset)
+        if (size <= 0) {
+          Future.successful(List.empty[core.Wallet])
+        } else {
+          for {
+            fetchWallets <- coreP.getWallets(offset, size).map(_.asScala.toList)
+            nextWallets <- walletsFromOffset(offset + batch)
+          } yield fetchWallets ++ nextWallets
+        }
+      }
+      walletsFromOffset(0)
+    }
+  }
+
   private def startListen(wallet: core.Wallet): Future[core.Wallet] = {
     for {
       _ <- wallet.startCacheAndRealTimeObserver
