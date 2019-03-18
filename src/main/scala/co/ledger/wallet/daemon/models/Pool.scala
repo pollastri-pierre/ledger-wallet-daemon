@@ -6,7 +6,7 @@ import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.PoolDto
-import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
+import co.ledger.wallet.daemon.exceptions.{CurrencyNotFoundException, WalletNotFoundException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
@@ -18,7 +18,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
 import Wallet._
-import co.ledger.core.ConfigurationDefaults
+import co.ledger.core.{ConfigurationDefaults, ErrorCode}
 
 import scala.collection.JavaConverters._
 import scala.collection._
@@ -127,17 +127,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
 
   def addWalletIfNotExist(walletName: String, currencyName: String): Future[core.Wallet] = {
     coreP.getCurrency(currencyName).flatMap { coreC =>
-      val walletConfig = core.DynamicObject.newInstance()
-      val apiUrl = DaemonConfiguration.explorer.api.paths.get(coreC.getName) match {
-        case Some(path) => path.host
-        case None => ConfigurationDefaults.BLOCKCHAIN_DEFAULT_API_ENDPOINT
-      }
-      walletConfig.putString("BLOCKCHAIN_EXPLORER_API_ENDPOINT", apiUrl)
-      val wsUrl = DaemonConfiguration.explorer.ws.getOrElse(
-        coreC.getName,
-        DaemonConfiguration.explorer.ws("default"))
-      walletConfig.putString("BLOCKCHAIN_OBSERVER_WS_ENDPOINT", wsUrl)
-      coreP.createWallet(walletName, coreC, walletConfig).flatMap { coreW =>
+      coreP.createWallet(walletName, coreC, buildWalletConfig(currencyName)).flatMap { coreW =>
         info(LogMsgMaker.newInstance("Wallet created").append("name", walletName).append("pool_name", name).append("currency_name", currencyName).toString())
         startListen(coreW)
       }.recoverWith {
@@ -151,6 +141,27 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
       }
     }.recoverWith {
       case _: core.implicits.CurrencyNotFoundException => Future.failed(CurrencyNotFoundException(currencyName))
+    }
+  }
+
+  def updateWalletConfig(wallet: core.Wallet): Future[core.Wallet] = {
+    val walletConfig = buildWalletConfig(wallet.getCurrency.getName)
+    info(LogMsgMaker.newInstance("Updating wallet")
+      .append("pool_name", name)
+      .append("wallet_name", wallet.getName)
+      .append("api_endpoint", walletConfig.getString("BLOCKCHAIN_EXPLORER_API_ENDPOINT"))
+      .append("ws_endpoint", walletConfig.getString("BLOCKCHAIN_OBSERVER_WS_ENDPOINT"))
+      .toString())
+    coreP.updateWalletConfig(wallet.getName, walletConfig) flatMap { result =>
+      info(LogMsgMaker.newInstance("Wallet update result")
+        .append("pool_name", name)
+        .append("wallet_name", wallet.getName)
+        .append("result", result)
+        .toString())
+      result match {
+        case ErrorCode.FUTURE_WAS_SUCCESSFULL => Future.successful(wallet)
+        case _ => Future.failed(WalletNotFoundException(wallet.getName))
+      }
     }
   }
 
@@ -233,6 +244,18 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
   }
 
   override def toString: String = s"Pool(name: $name, id: $id)"
+
+  private def buildWalletConfig(currencyName: String): core.DynamicObject = {
+    val walletConfig = core.DynamicObject.newInstance()
+    val apiUrl = DaemonConfiguration.explorer.api.paths.get(currencyName) match {
+      case Some(path) => path.host
+      case None => ConfigurationDefaults.BLOCKCHAIN_DEFAULT_API_ENDPOINT
+    }
+    walletConfig.putString("BLOCKCHAIN_EXPLORER_API_ENDPOINT", apiUrl)
+    val wsUrl = DaemonConfiguration.explorer.ws.getOrElse(currencyName, DaemonConfiguration.explorer.ws("default"))
+    walletConfig.putString("BLOCKCHAIN_OBSERVER_WS_ENDPOINT", wsUrl)
+    walletConfig
+  }
 }
 
 object Pool {

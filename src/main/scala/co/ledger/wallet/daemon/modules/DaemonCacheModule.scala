@@ -62,7 +62,7 @@ object DaemonCacheModule extends TwitterModule {
       pools <- Future.sequence(users.map(_.pools())).map(_.flatten)
     } yield pools.map { pool =>
       pool.wallets.map ( _.map { wallet =>
-        pool.addWalletIfNotExist(wallet.getName, wallet.getCurrency.getName)
+        pool.updateWalletConfig(wallet)
       })
     }
 
