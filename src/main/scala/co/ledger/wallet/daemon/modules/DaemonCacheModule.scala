@@ -12,7 +12,7 @@ import com.twitter.concurrent.NamedPoolThreadFactory
 import com.twitter.inject.{Injector, TwitterModule}
 import com.twitter.util.{Duration, ScheduledThreadPoolTimer, Time}
 
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
@@ -56,6 +56,16 @@ object DaemonCacheModule extends TwitterModule {
       val existingUser = Await.result(usersService.user(user._1), 1.minutes)
       if (existingUser.isEmpty) Await.result(usersService.createUser(user._1, user._2), 1.minutes)
     }
+
+    for {
+      users <- provideDaemonCache.getUsers
+      pools <- Future.sequence(users.map(_.pools())).map(_.flatten)
+    } yield pools.map { pool =>
+      pool.wallets.map ( _.map { wallet =>
+        pool.updateWalletConfig(wallet)
+      })
+    }
+
     val scheduler = new ScheduledThreadPoolTimer(
       poolSize = 1,
       threadFactory = new NamedPoolThreadFactory("scheduler-thread-pool")
