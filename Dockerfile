@@ -1,6 +1,8 @@
 ### BUILD STEP ###
 FROM openjdk:8u181-jdk-stretch as builder
+ARG COMMIT_HASH=""
 ENV STAGE dev
+ENV COMMIT_HASH $COMMIT_HASH
 
 WORKDIR /build
 ADD . /build

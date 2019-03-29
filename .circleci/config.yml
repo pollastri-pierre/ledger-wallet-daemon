@@ -7,6 +7,11 @@ workflows:
   build_test_and_publish:
     jobs:
       - docker/build_image:
+          after_checkout:
+            - run:
+                name: Set version environment variable
+                command: echo "export COMMIT_HASH=$(git rev-parse HEAD)" >> $BASH_ENV
+          docker_build_args: --build-arg COMMIT_HASH
           filters:
             tags:
               only: /v.*/
