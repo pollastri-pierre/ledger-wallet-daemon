@@ -1,5 +1,7 @@
 name := "daemon"
 
+version := "0.0.0"
+
 organization := "co.ledger"
 scalaVersion := "2.12.2"
 
@@ -116,3 +118,11 @@ libraryDependencies ++= Seq(
   compilerPlugin("com.github.ghik" %% "silencer-plugin" % "1.3.1"),
   "com.github.ghik" %% "silencer-lib" % "1.3.1" % Provided
 )
+
+// For sbt plugin sbt-buildinfo
+enablePlugins(BuildInfoPlugin)
+buildInfoKeys := Seq[BuildInfoKey](
+  name,
+  version,
+  "commitHash" -> sys.env.getOrElse("COMMIT_HASH", "unknown-commit-hash"))
+buildInfoPackage := "co.ledger.wallet.daemon"
