@@ -8,7 +8,6 @@ import co.ledger.wallet.daemon.models.Wallet.RichCoreWallet
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
 import co.ledger.wallet.daemon.models.coins.{Bitcoin, EthereumTransactionView}
 import com.fasterxml.jackson.annotation.JsonProperty
-import co.ledger.wallet.daemon.utils.Utils.RichBigInt
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
@@ -44,8 +43,8 @@ object Operations {
       operation.getDate,
       Option(height),
       operation.getOperationType,
-      operation.getAmount.toBigInt.asScala,
-      operation.getFees.toBigInt.asScala,
+      operation.getAmount.toString,
+      operation.getFees.toString,
       wallet.getName,
       account.getIndex,
       operation.getSenders.asScala.toList,
@@ -83,8 +82,8 @@ object Operations {
                             @JsonProperty("time") time: Date,
                             @JsonProperty("block_height") blockHeight: Option[Long],
                             @JsonProperty("type") opType: core.OperationType,
-                            @JsonProperty("amount") amount: BigInt,
-                            @JsonProperty("fees") fees: BigInt,
+                            @JsonProperty("amount") amount: String,
+                            @JsonProperty("fees") fees: String,
                             @JsonProperty("wallet_name") walletName: String,
                             @JsonProperty("account_index") accountIndex: Int,
                             @JsonProperty("senders") senders: Seq[String],

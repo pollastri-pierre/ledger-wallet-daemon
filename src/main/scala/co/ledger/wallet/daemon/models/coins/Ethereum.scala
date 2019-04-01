@@ -33,10 +33,10 @@ case class EthereumTransactionView(
                                     @JsonProperty("hash") hash: String,
                                     @JsonProperty("receiver") receiver: String,
                                     @JsonProperty("sender") sender: String,
-                                    @JsonProperty("value") value: scala.BigInt,
+                                    @JsonProperty("value") value: String,
                                     @JsonProperty("erc20") erc20: Option[EthereumTransactionView.ERC20],
-                                    @JsonProperty("gas_price") gasPrice: scala.BigInt,
-                                    @JsonProperty("gas_limit") gasLimit: scala.BigInt,
+                                    @JsonProperty("gas_price") gasPrice: String,
+                                    @JsonProperty("gas_limit") gasLimit: String,
                                     @JsonProperty("date") date: Date
                                   ) extends TransactionView
 
@@ -47,10 +47,10 @@ object EthereumTransactionView {
       tx.getHash,
       tx.getReceiver.toEIP55,
       tx.getSender.toEIP55,
-      tx.getValue.toBigInt.asScala,
+      tx.getValue.toString,
       ERC20.from(tx.getData).toOption,
-      tx.getGasPrice.toBigInt.asScala,
-      tx.getGasLimit.toBigInt.asScala,
+      tx.getGasPrice.toString,
+      tx.getGasLimit.toString,
       tx.getDate,
     )
   }
@@ -77,10 +77,10 @@ object EthereumTransactionView {
 case class UnsignedEthereumTransactionView(
                                             @JsonProperty("hash") hash: String,
                                             @JsonProperty("receiver") receiver: String,
-                                            @JsonProperty("value") value: scala.BigInt,
-                                            @JsonProperty("gas_price") gasPrice: scala.BigInt,
-                                            @JsonProperty("gas_limit") gasLimit: scala.BigInt,
-                                            @JsonProperty("fees") fees: scala.BigInt,
+                                            @JsonProperty("value") value: String,
+                                            @JsonProperty("gas_price") gasPrice: String,
+                                            @JsonProperty("gas_limit") gasLimit: String,
+                                            @JsonProperty("fees") fees: String,
                                             @JsonProperty("raw_transaction") rawTransaction: String
                                           ) extends TransactionView
 
@@ -89,10 +89,10 @@ object UnsignedEthereumTransactionView {
     UnsignedEthereumTransactionView(
       tx.getHash,
       tx.getReceiver.toEIP55,
-      tx.getValue.toBigInt.asScala,
-      tx.getGasPrice.toBigInt.asScala,
-      tx.getGasLimit.toBigInt.asScala,
-      tx.getGasPrice.toBigInt.asScala * tx.getGasLimit.toBigInt.asScala,
+      tx.getValue.toString,
+      tx.getGasPrice.toString,
+      tx.getGasLimit.toString,
+      (tx.getGasPrice.toBigInt.asScala * tx.getGasLimit.toBigInt.asScala).toString,
       HexUtils.valueOf(tx.serialize())
     )
   }
