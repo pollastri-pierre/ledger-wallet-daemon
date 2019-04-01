@@ -109,25 +109,31 @@ object TransactionsController {
   }
 
   case class CreateETHTransactionRequest(recipient: String,
-                                         amount: BigInt,
-                                         gas_limit: Option[BigInt],
-                                         gas_price: Option[BigInt],
+                                         amount: String,
+                                         gas_limit: Option[String],
+                                         gas_price: Option[String],
                                          contract: Option[String]
                                         ) extends CreateTransactionRequest {
-    override def transactionInfo: TransactionInfo = ETHTransactionInfo(recipient, amount, gas_limit, gas_price, contract)
+    def amountValue: BigInt = BigInt(amount)
+    def gasLimitValue: Option[BigInt] = gas_limit.map(BigInt(_))
+    def gasPriceValue: Option[BigInt] = gas_price.map(BigInt(_))
+
+    override def transactionInfo: TransactionInfo = ETHTransactionInfo(recipient, amountValue, gasLimitValue, gasPriceValue, contract)
   }
 
   case class CreateBTCTransactionRequest(recipient: String,
-                                         fees_per_byte: Option[BigInt],
+                                         fees_per_byte: Option[String],
                                          fees_level: Option[String],
-                                         amount: BigInt,
+                                         amount: String,
                                          exclude_utxos: Option[Map[String, Int]],
                                         ) extends CreateTransactionRequest {
+    def amountValue: BigInt = BigInt(amount)
+    def feesPerByteValue: Option[BigInt] = fees_per_byte.map(BigInt(_))
 
-    def transactionInfo: BTCTransactionInfo = BTCTransactionInfo(recipient, fees_per_byte, fees_level, amount, exclude_utxos.getOrElse(Map[String, Int]()))
+    def transactionInfo: BTCTransactionInfo = BTCTransactionInfo(recipient, feesPerByteValue, fees_level, amountValue, exclude_utxos.getOrElse(Map[String, Int]()))
 
     @MethodValidation
-    def validateFees: ValidationResult = CommonMethodValidations.validateFees(fees_per_byte, fees_level)
+    def validateFees: ValidationResult = CommonMethodValidations.validateFees(feesPerByteValue, fees_level)
   }
 
   trait TransactionInfo
