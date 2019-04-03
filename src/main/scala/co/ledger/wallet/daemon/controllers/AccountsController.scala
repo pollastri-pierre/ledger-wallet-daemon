@@ -114,6 +114,12 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         accountsService.getBalance(request.contract, request.accountInfo)
       }
 
+      // End point queries for account xpub
+      get("/xpub") { request: AccountRequest =>
+        info(s"GET account xpub $request")
+        accountsService.getXpub(request.accountInfo)
+      }
+
       // End point queries for operation view with specified uid, return the first operation of this account if uid is 'first'.
       get("/operations/:uid") { request: OperationRequest =>
         info(s"GET account operation $request")
