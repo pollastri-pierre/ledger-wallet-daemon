@@ -5,7 +5,7 @@ import java.sql.ResultSet
 import co.ledger.core.{DatabaseBlob, DatabaseResultRow}
 
 /**
-  * Describe your class here.
+  * A single row of a result set.
   *
   * User: Pierre Pollastri
   * Date: 17-01-2019

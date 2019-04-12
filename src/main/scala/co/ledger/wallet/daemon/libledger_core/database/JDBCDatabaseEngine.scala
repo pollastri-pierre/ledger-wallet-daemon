@@ -4,7 +4,7 @@ import co.ledger.core.{DatabaseConnection, DatabaseConnectionPool, DatabaseEngin
 import slick.jdbc.{JdbcDataSource}
 
 /**
-  * Describe your class here.
+  * Core library implementation of a database engine using JDBC as its backend.
   *
   * User: Pierre Pollastri
   * Date: 16-01-2019

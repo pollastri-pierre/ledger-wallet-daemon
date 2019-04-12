@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.libledger_core.database
 import co.ledger.core.DatabaseError
 
 /**
-  * Describe your class here.
+  * Hold a JDBC error message in case of database error.
   *
   * User: Pierre Pollastri
   * Date: 17-01-2019

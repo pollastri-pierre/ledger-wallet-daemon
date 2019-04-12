@@ -5,7 +5,7 @@ import java.sql.Blob
 import co.ledger.core.DatabaseBlob
 
 /**
-  * Describe your class here.
+  * Wrapper around JDBC BLOB implementation for core library database engine.
   *
   * User: Pierre Pollastri
   * Date: 16-01-2019

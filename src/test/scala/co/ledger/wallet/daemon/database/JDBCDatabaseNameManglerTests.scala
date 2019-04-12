@@ -5,7 +5,7 @@ import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
 /**
-  * Describe your class here.
+  * Tests for the database name mangler.
   *
   * User: Pierre Pollastri
   * Date: 24-01-2019

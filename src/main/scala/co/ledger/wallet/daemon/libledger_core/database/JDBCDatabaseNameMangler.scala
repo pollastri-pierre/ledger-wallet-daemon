@@ -10,7 +10,7 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
 /**
-  * Describe your class here.
+  * Mangle SQL queries to store multiple virtual database into one.
   *
   * User: Pierre Pollastri
   * Date: 24-01-2019
