@@ -18,14 +18,9 @@ import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
 import Wallet._
-<<<<<<< HEAD
-import co.ledger.core.ErrorCode
-import co.ledger.core.ConfigurationDefaults
 import co.ledger.wallet.daemon.libledger_core.database.JDBCDatabaseEngine
 import slick.jdbc.JdbcDataSource
-=======
 import co.ledger.core.{ConfigurationDefaults, ErrorCode}
->>>>>>> origin/develop
 
 import scala.collection.JavaConverters._
 import scala.collection._
