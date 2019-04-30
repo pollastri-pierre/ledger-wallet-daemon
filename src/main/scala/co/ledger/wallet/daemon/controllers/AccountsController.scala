@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.controllers
 
-import java.util.{Date, UUID, ArrayList}
+import java.util.{Date, UUID}
 
 import co.ledger.core.{OperationType, TimePeriod}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
@@ -19,6 +19,8 @@ import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 import javax.inject.Inject
+import scala.concurrent.Future
+
 
 
 import scala.concurrent.ExecutionContext
@@ -143,7 +145,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         info(s"Get history $request")
         for {
           accountOpt <- accountsService.getAccount(request.accountInfo)
-          account = accountOpt.getOrElse(throw AccountNotFoundException(request.account_index))
+          account <- accountOpt.map(Future.successful).getOrElse(Future.failed(AccountNotFoundException(request.account_index)))
           balances <- account.balances(request.start, request.end, request.timePeriod)
           operationCounts <- account.operationsCounts(request.startDate, request.endDate, request.timePeriod)
         } yield HistoryResponse(balances, operationCounts)
@@ -171,9 +173,13 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
 
       // Return the balances and operation counts history of token accounts in the order of the starting time to the end time.
       get("/tokens/:token_address/history") { request: TokenHistoryRequest =>
-        info(s"Get history $request")
-        accountsService.getTokenCoreAccountBalanceHistory(request.tokenAccountInfo, request.startDate, request.endDate, request.timePeriod).map(TokenHistoryResponse(_))
-      }
+        for {
+          balances <- accountsService.getTokenCoreAccountBalanceHistory(request.tokenAccountInfo, request.startDate, request.endDate, request.timePeriod)
+          accountOpt <- accountsService.getAccount(request.tokenAccountInfo.accountInfo)
+          account <- accountOpt.map(Future.successful).getOrElse(Future.failed(AccountNotFoundException(request.account_index)))
+          operationCounts <- account.ERC20operationsCounts(request.startDate, request.endDate, request.timePeriod, request.tokenAccountInfo.tokenAddress)
+        } yield TokenHistoryResponse(balances, operationCounts)
+    }
 
       // given token address, get the operations on this token
       get("/tokens/:token_address/operations") { request: TokenAccountRequest =>
@@ -209,7 +215,7 @@ object AccountsController {
 
   case class HistoryResponse(balances: List[BigInt], operationCounts: List[Map[OperationType, Int]])
 
-  case class TokenHistoryResponse(balances: ArrayList[co.ledger.core.BigInt])
+  case class TokenHistoryResponse(balances: List[BigInt], operationCounts: List[Map[OperationType, Int]])
 
   case class HistoryRequest(
                              @RouteParam override val pool_name: String,

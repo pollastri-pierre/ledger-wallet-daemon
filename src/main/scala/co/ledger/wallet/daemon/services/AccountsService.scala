@@ -1,5 +1,7 @@
 package co.ledger.wallet.daemon.services
 
+import co.ledger.wallet.daemon.utils.Utils.RichBigInt
+
 import java.util.{Date, UUID}
 
 import cats.implicits._
@@ -13,7 +15,7 @@ import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import javax.inject.{Inject, Singleton}
-import java.util.ArrayList
+import scala.collection.JavaConverters._
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -79,8 +81,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
   def getTokenCoreAccount(tokenAccountInfo: TokenAccountInfo): Future[core.ERC20LikeAccount] =
     daemonCache.withAccount(tokenAccountInfo.accountInfo)(_.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future])
 
-  def getTokenCoreAccountBalanceHistory(tokenAccountInfo: TokenAccountInfo, startDate: Date, endDate: Date, period: core.TimePeriod): Future[ArrayList[core.BigInt]] = {
-    getTokenCoreAccount(tokenAccountInfo).map(_.getBalanceHistoryFor(startDate, endDate, period))
+  def getTokenCoreAccountBalanceHistory(tokenAccountInfo: TokenAccountInfo, startDate: Date, endDate: Date, period: core.TimePeriod): Future[List[BigInt]] = {
+    getTokenCoreAccount(tokenAccountInfo).map(_.getBalanceHistoryFor(startDate, endDate, period).asScala.map(_.asScala).toList)
   }
 
   def accountFreshAddresses(accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = {
