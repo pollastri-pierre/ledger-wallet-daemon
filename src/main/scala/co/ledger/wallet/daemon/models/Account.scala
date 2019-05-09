@@ -77,6 +77,9 @@ object Account extends Logging {
     def operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] =
       Account.operationsCounts(start, end, timePeriod, a)
 
+    def ERC20operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, contract_address: String)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] =
+      Account.ERC20operationsCounts(start, end, timePeriod, a, contract_address)
+
     def freshAddresses(implicit ec: ExecutionContext): Future[Seq[core.Address]] =
       Account.freshAddresses(a)
 
@@ -259,6 +262,18 @@ object Account extends Logging {
   def operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, a: core.Account)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] = {
     a.queryOperations().addOrder(OperationOrderKey.DATE, true).partial().execute().map { operations =>
       val ops = operations.asScala.toList.filter(op => op.getDate.compareTo(start) >= 0 && op.getDate.compareTo(end) <= 0)
+      filter(start, 1, end, standardTimePeriod(timePeriod), ops, Nil)
+    }
+  }
+
+  // TODO: refactor this part once lib-core provides the feature
+  def ERC20operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, a: core.Account, contract_address: String)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] = {
+    val sorted_ops = for {
+      operations <- a.erc20Operations(contract_address)
+    } yield operations.sortBy(_.getDate)
+
+    sorted_ops.map{ operations =>
+      val ops = operations.filter(op => op.getDate.compareTo(start) >= 0 && op.getDate.compareTo(end) <= 0)
       filter(start, 1, end, standardTimePeriod(timePeriod), ops, Nil)
     }
   }
