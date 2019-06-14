@@ -31,5 +31,6 @@ workflows:
                 - develop
                 - develop-drop2
                 - release_candidate
+		- release_candidate_drop2
             tags:
               only: /v.*/
