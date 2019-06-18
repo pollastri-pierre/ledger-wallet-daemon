@@ -2,14 +2,17 @@ package co.ledger.wallet.daemon.clients
 
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.models.FeeMethod
+import co.ledger.wallet.daemon.utils.HexUtils
 import co.ledger.wallet.daemon.utils.Utils._
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.{Method, Request, Response}
 import com.twitter.finagle.{Http, Service}
 import com.twitter.finatra.json.FinatraObjectMapper
+import com.twitter.inject.Logging
 import javax.inject.Singleton
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 /**
   * Client for request to blockchain explorers.
@@ -21,7 +24,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 // TODO: Map response from service to be more readable
 @Singleton
-class ApiClient(implicit val ec: ExecutionContext) {
+class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   import ApiClient._
 
   def getFees(currencyName: String): Future[FeeInfo] = {
@@ -33,12 +36,22 @@ class ApiClient(implicit val ec: ExecutionContext) {
     }.asScala
   }
 
-  def getGasLimit(currencyName: String, recipient: String): Future[BigInt] = {
+  def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
-    val request = Request(Method.Get, s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit")
-      .host(host)
+    val request = Request(
+      Method.Get,
+      s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit"
+    ).host(host)
+    val body = source.map(s => Map[String, String]("from" -> s)).getOrElse(Map[String, String]()) ++
+      inputData.map(d => Map[String, String]("data" -> s"0x${HexUtils.valueOf(d)}")).getOrElse(Map[String, String]())
+    request.setContentString(scala.util.parsing.json.JSONObject(body).toString())
+    request.setContentType("application/json")
+
     service(request).map { response =>
-      mapper.parse[GasLimit](response).limit
+      Try(mapper.parse[GasLimit](response).limit).getOrElse({
+        info(s"Failed to estimate gas limit, using default: Request=${request.contentString} ; Response=${response.contentString}")
+        defaultGasLimit
+      })
     }.asScala
   }
 
@@ -89,6 +102,7 @@ class ApiClient(implicit val ec: ExecutionContext) {
       "ethereum_ropsten" -> "/blockchain/v3/fees",
     )
   }
+  private val defaultGasLimit = BigInt(200000)
 }
 
 object ApiClient {
