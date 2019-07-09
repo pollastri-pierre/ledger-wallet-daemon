@@ -29,13 +29,13 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 object Account extends Logging {
 
   implicit class RichCoreAccount(val a: core.Account) extends AnyVal {
-    def erc20Balance(contract: String): Either[Exception, scala.BigInt] =
-      Account.erc20Balance(contract, a)
+    def erc20Balance(contract: String)(implicit ec: ExecutionContext): Future[scala.BigInt] =
+      Account.erc20Balance(contract, a).liftTo[Future].flatten
 
-    def erc20Operations(contract: String)(implicit ec: ExecutionContext): Future[List[core.Operation]] =
+    def erc20Operations(contract: String)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
       Account.erc20Operations(contract, a)
 
-    def erc20Operations(implicit ec: ExecutionContext): Future[List[core.Operation]] =
+    def erc20Operations(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
       Account.erc20Operations(a)
 
     def erc20Accounts: Either[Exception, List[core.ERC20LikeAccount]] =
@@ -115,18 +115,24 @@ object Account extends Logging {
   def erc20Accounts(a: core.Account): Either[Exception, List[core.ERC20LikeAccount]] =
     asETHAccount(a).map(_.getERC20Accounts.asScala.toList)
 
-  def erc20Balance(contract: String, a: core.Account): Either[Exception, scala.BigInt] =
-    asERC20Account(contract, a).map(_.getBalance.asScala)
+  def erc20Balance(contract: String, a: core.Account)
+                  (implicit ex: ExecutionContext): Either[Exception, Future[scala.BigInt]] =
+    asERC20Account(contract, a).map(_.getBalance().map(_.asScala))
 
-  def erc20Operations(contract: String, a: core.Account)(implicit ec: ExecutionContext): Future[List[core.Operation]] =
+  def erc20Operations(contract: String, a: core.Account)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
     asERC20Account(contract, a).liftTo[Future].flatMap(erc20Operations)
 
-  private def erc20Operations(a: core.ERC20LikeAccount)(implicit ec: ExecutionContext):
-  Future[List[core.Operation]] =
-      a.queryOperations().complete().execute().map(_.asScala.toList)
-
-  def erc20Operations(a: core.Account)(implicit ec: ExecutionContext): Future[List[core.Operation]] =
+  def erc20Operations(a: core.Account)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
     asETHAccount(a).liftTo[Future].flatMap(_.getERC20Accounts.asScala.toList.traverse(erc20Operations).map(_.flatten))
+
+  private def erc20Operations(a: core.ERC20LikeAccount)(implicit ec: ExecutionContext):
+  Future[List[(core.Operation, core.ERC20LikeOperation)]] =
+    for {
+      coreOps <- a.queryOperations().complete().execute().map(_.asScala.toList)
+      hashToCoreOps = coreOps.map(coreOp => coreOp.asEthereumLikeOperation().getTransaction.getHash -> coreOp).toMap
+      erc20Ops = a.getOperations.asScala.toList
+    } yield erc20Ops.map(erc20Op => (hashToCoreOps(erc20Op.getHash), erc20Op))
+
 
   def operationCounts(a: core.Account)(implicit ex: ExecutionContext): Future[Map[core.OperationType, Int]] =
     a.queryOperations().addOrder(OperationOrderKey.DATE, true).partial().execute().map { os =>
@@ -218,22 +224,23 @@ object Account extends Logging {
   Future[EthereumLikeTransactionBuilder] =
     a.asEthereumLikeAccount().getERC20Accounts.asScala.find(_.getToken.getContractAddress == contract) match {
       case Some(erc20Account) =>
-        val balance: scala.BigInt = erc20Account.getBalance.asScala
-        if (balance >= ti.amount) {
-          val inputData = erc20Account.getTransferToAddressData(BigInt.fromIntegerString(ti.amount.toString(10), 10), ti.recipient)
-          val v = a.asEthereumLikeAccount()
-            .buildTransaction()
-            .sendToAddress(c.convertAmount(0), contract)
-            .setInputData(inputData)
-          for {
-            gasLimit <- ti.gasLimit match {
-              case Some(amount) => Future.successful(amount)
-              case None => ClientFactory.apiClient.getGasLimit(
-                c.getName, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
-            }
-          } yield v.setGasLimit(c.convertAmount(gasLimit))
-        } else {
-          Future.failed(ERC20BalanceNotEnough(erc20Account.getToken.getContractAddress, balance, ti.amount))
+        erc20Account.getBalance().flatMap { balance =>
+          if (balance.asScala >= ti.amount) {
+            for {
+              inputData <- erc20Account.getTransferToAddressData(BigInt.fromIntegerString(ti.amount.toString(10), 10), ti.recipient)
+              v = a.asEthereumLikeAccount()
+                .buildTransaction()
+                .sendToAddress(c.convertAmount(0), contract)
+                .setInputData(inputData)
+              gasLimit <- ti.gasLimit match {
+                case Some(amount) => Future.successful(amount)
+                case None => ClientFactory.apiClient.getGasLimit(
+                  c.getName, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
+              }
+            } yield v.setGasLimit(c.convertAmount(gasLimit))
+          } else {
+            Future.failed(ERC20BalanceNotEnough(erc20Account.getToken.getContractAddress, balance.asScala, ti.amount))
+          }
         }
       case None => Future.failed(ERC20BalanceNotEnough(contract, 0, ti.amount))
   }
@@ -279,7 +286,7 @@ object Account extends Logging {
   def ERC20operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, a: core.Account, contract_address: String)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] = {
     val sorted_ops = for {
       operations <- a.erc20Operations(contract_address)
-    } yield operations.sortBy(_.getDate)
+    } yield operations.map(_._1).sortBy(_.getDate)
 
     sorted_ops.map{ operations =>
       val ops = operations.filter(op => op.getDate.compareTo(start) >= 0 && op.getDate.compareTo(end) <= 0)
@@ -416,14 +423,17 @@ case class ERC20AccountView(
                            )
 
 object ERC20AccountView {
-  def apply(erc20Account: ERC20LikeAccount): ERC20AccountView = {
-    ERC20AccountView(
-      erc20Account.getToken.getContractAddress,
-      erc20Account.getToken.getName,
-      erc20Account.getToken.getNumberOfDecimal,
-      erc20Account.getToken.getSymbol,
-      erc20Account.getBalance.asScala
-    )
+  def apply(erc20Account: ERC20LikeAccount)
+           (implicit ec: ExecutionContext): Future[ERC20AccountView] = {
+    erc20Account.getBalance().map { balance =>
+      ERC20AccountView(
+        erc20Account.getToken.getContractAddress,
+        erc20Account.getToken.getName,
+        erc20Account.getToken.getNumberOfDecimal,
+        erc20Account.getToken.getSymbol,
+        balance.asScala
+      )
+    }
   }
 }
 
