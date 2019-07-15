@@ -168,9 +168,11 @@ object Account extends Logging {
         val v: Long = c.getEthereumLikeNetworkParameters.getChainID.toLong * 2 + 35
         tx.setDERSignature(signature)
         tx.setVSignature(HexUtils.valueOf(v.toHexString))
+        debug(s"transaction after sign '${HexUtils.valueOf(tx.serialize())}'")
         a.asEthereumLikeAccount().broadcastTransaction(tx).recoverWith {
           case _ =>
             tx.setVSignature(HexUtils.valueOf((v + 1).toHexString))
+            debug(s"transaction after sign with V '${HexUtils.valueOf(tx.serialize())}'")
             a.asEthereumLikeAccount().broadcastTransaction(tx)
         }
       case Left(m) => Future.failed(new UnsupportedOperationException(s"Account type not supported, can't broadcast ETH transaction: $m"))
