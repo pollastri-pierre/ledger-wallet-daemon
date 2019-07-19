@@ -4,7 +4,11 @@ import co.ledger.wallet.daemon.utils.Utils.RichBigInt
 
 import java.util.{Date, UUID}
 
-import cats.implicits._
+import cats.instances.future._
+import cats.instances.list._
+import cats.instances.option._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import co.ledger.core
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.database.DaemonCache
@@ -81,12 +85,20 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     }
 
   def getTokenAccounts(accountInfo: AccountInfo): Future[List[ERC20AccountView]] =
-    daemonCache.withAccount(accountInfo)(_.erc20Accounts.liftTo[Future].flatMap { accounts =>
-      Future.sequence(accounts.map(ERC20AccountView(_)))
-    })
+    daemonCache.withAccount(accountInfo) { account =>
+      for {
+        erc20Accounts <- account.erc20Accounts.liftTo[Future]
+        views <- erc20Accounts.map(ERC20AccountView.fromERC20Account).sequence
+      } yield views
+    }
 
   def getTokenAccount(tokenAccountInfo: TokenAccountInfo): Future[ERC20AccountView] =
-    daemonCache.withAccount(tokenAccountInfo.accountInfo)(_.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future].flatMap(ERC20AccountView(_)))
+    daemonCache.withAccount(tokenAccountInfo.accountInfo) { account =>
+      for {
+        erc20Account <- account.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future]
+        view <- ERC20AccountView.fromERC20Account(erc20Account)
+      } yield view
+    }
 
   def getTokenCoreAccount(tokenAccountInfo: TokenAccountInfo): Future[core.ERC20LikeAccount] =
     daemonCache.withAccount(tokenAccountInfo.accountInfo)(_.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future])

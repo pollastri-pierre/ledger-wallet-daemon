@@ -3,10 +3,17 @@ name := "daemon"
 version := "0.0.0"
 
 organization := "co.ledger"
-scalaVersion := "2.12.2"
+scalaVersion := "2.12.8"
 
 enablePlugins(JavaServerAppPackaging)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
+
+// For cancelable processes in interactive shell
+cancelable in Global := true
+
+// To close the server stream when we run it in interactive shell
+fork in run := true
+
 concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
 parallelExecution in Test := false
 parallelExecution in IntegrationTest := false
@@ -27,7 +34,7 @@ lazy val versions = new {
   val postgre   = "9.3-1100-jdbc4"
   val slick     = "3.2.1"
   val sqlite    = "3.7.15-M1"
-  val cats = "1.5.0-RC1"
+  val cats      = "1.5.0"
 }
 
 libraryDependencies ++= Seq(

@@ -5,4 +5,5 @@ package object models {
   type BTCSignature = Array[Byte]
   type BTCSigPub = (BTCSignature, BTCPubKey)
   type ETHSignature = Array[Byte]
+  type XRPSignature = Array[Byte]
 }

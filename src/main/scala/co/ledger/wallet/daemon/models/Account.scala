@@ -2,18 +2,21 @@ package co.ledger.wallet.daemon.models
 
 import java.util.{Calendar, Date}
 
-import cats.implicits._
+import cats.instances.future._
+import cats.instances.list._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import co.ledger.core
 import co.ledger.core._
 import co.ledger.core.implicits.{UnsupportedOperationException, _}
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
-import co.ledger.wallet.daemon.controllers.TransactionsController.{BTCTransactionInfo, ETHTransactionInfo, TransactionInfo}
+import co.ledger.wallet.daemon.controllers.TransactionsController.{BTCTransactionInfo, ETHTransactionInfo, TransactionInfo, XRPTransactionInfo}
 import co.ledger.wallet.daemon.exceptions.{ERC20BalanceNotEnough, ERC20NotFoundException, SignatureSizeUnmatchException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
-import co.ledger.wallet.daemon.models.coins.{Bitcoin, UnsignedBitcoinTransactionView, UnsignedEthereumTransactionView}
+import co.ledger.wallet.daemon.models.coins.{Bitcoin, UnsignedEthereumTransactionView, UnsignedRippleTransactionView}
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -30,7 +33,7 @@ object Account extends Logging {
 
   implicit class RichCoreAccount(val a: core.Account) extends AnyVal {
     def erc20Balance(contract: String)(implicit ec: ExecutionContext): Future[scala.BigInt] =
-      Account.erc20Balance(contract, a).liftTo[Future].flatten
+      Account.erc20Balance(contract, a)
 
     def erc20Operations(contract: String)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
       Account.erc20Operations(contract, a)
@@ -65,6 +68,9 @@ object Account extends Logging {
     def broadcastETHTransaction(rawTx: Array[Byte], signatures: ETHSignature, c: core.Currency)(implicit ec: ExecutionContext): Future[String] =
       Account.broadcastETHTransaction(rawTx, signatures, a, c)
 
+    def broadcastXRPTransaction(rawTx: Array[Byte], signatures: XRPSignature, c: core.Currency): Future[String] =
+      Account.broadcastXRPTransaction(rawTx, signatures, a, c)
+
     def createTransaction(transactionInfo: TransactionInfo, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] =
       Account.createTransaction(transactionInfo, a, c)
 
@@ -94,7 +100,7 @@ object Account extends Logging {
   }
 
   def balance(a: core.Account)(implicit ex: ExecutionContext): Future[scala.BigInt] = a.getBalance().map { b =>
-    debug(s"Account ${a.getIndex}, balance: ${b}")
+    debug(s"Account ${a.getIndex}, balance: $b")
     b.toBigInt.asScala
   }
 
@@ -115,24 +121,27 @@ object Account extends Logging {
   def erc20Accounts(a: core.Account): Either[Exception, List[core.ERC20LikeAccount]] =
     asETHAccount(a).map(_.getERC20Accounts.asScala.toList)
 
-  def erc20Balance(contract: String, a: core.Account)
-                  (implicit ex: ExecutionContext): Either[Exception, Future[scala.BigInt]] =
-    asERC20Account(contract, a).map(_.getBalance().map(_.asScala))
+  def erc20Balance(contract: String, a: core.Account)(implicit ec: ExecutionContext): Future[scala.BigInt] =
+    for {
+      account <- asERC20Account(contract, a).liftTo[Future]
+      balance <- account.getBalance()
+    } yield balance.asScala
 
   def erc20Operations(contract: String, a: core.Account)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
     asERC20Account(contract, a).liftTo[Future].flatMap(erc20Operations)
 
   def erc20Operations(a: core.Account)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
-    asETHAccount(a).liftTo[Future].flatMap(_.getERC20Accounts.asScala.toList.traverse(erc20Operations).map(_.flatten))
-
-  private def erc20Operations(a: core.ERC20LikeAccount)(implicit ec: ExecutionContext):
-  Future[List[(core.Operation, core.ERC20LikeOperation)]] =
     for {
-      coreOps <- a.queryOperations().complete().execute().map(_.asScala.toList)
-      hashToCoreOps = coreOps.map(coreOp => coreOp.asEthereumLikeOperation().getTransaction.getHash -> coreOp).toMap
-      erc20Ops = a.getOperations.asScala.toList
-    } yield erc20Ops.map(erc20Op => (hashToCoreOps(erc20Op.getHash), erc20Op))
+      account <- asETHAccount(a).liftTo[Future]
+      ops <- account.getERC20Accounts.asScala.toList.flatTraverse(erc20Operations)
+    } yield ops
 
+  private def erc20Operations(a: core.ERC20LikeAccount)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
+    a.queryOperations().complete().execute().map(_.asScala.toList).map { coreOps =>
+      val hashToCoreOps = coreOps.map(coreOp => coreOp.asEthereumLikeOperation().getTransaction.getHash -> coreOp).toMap
+      val erc20Ops = a.getOperations.asScala.toList
+      erc20Ops.map(erc20Op => (hashToCoreOps(erc20Op.getHash), erc20Op))
+    }
 
   def operationCounts(a: core.Account)(implicit ex: ExecutionContext): Future[Map[core.OperationType, Int]] =
     a.queryOperations().addOrder(OperationOrderKey.DATE, true).partial().execute().map { os =>
@@ -179,51 +188,59 @@ object Account extends Logging {
     }
   }
 
-  def createTransaction(transactionInfo: TransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
-    (transactionInfo, c.getWalletType) match {
-      case (ti: BTCTransactionInfo, WalletType.BITCOIN) => createBtcTransaction(ti, a, c)
-      case (ti: ETHTransactionInfo, WalletType.ETHEREUM) => createEthTransaction(ti, a, c)
-      case _ => Future.failed(new UnsupportedOperationException("Account type not supported, can't create transaction"))
+  def broadcastXRPTransaction(rawTx: Array[Byte], signature: XRPSignature, a: core.Account, c: core.Currency): Future[String] = {
+    c.parseUnsignedXRPTransaction(rawTx) match {
+      case Right(tx) =>
+        tx.setDERSignature(signature)
+        a.asRippleLikeAccount.broadcastTransaction(tx)
+      case Left(m) => Future.failed(new UnsupportedOperationException(s"Account type not supported, can't broadcast XRP transaction: $m"))
     }
   }
 
-  private def createBtcTransaction(ti: BTCTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext):
-  Future[UnsignedBitcoinTransactionView] = for {
-    feesPerByte <- ti.feeAmount match {
-      case Some(amount) => Future.successful(c.convertAmount(amount))
-      case None => ClientFactory.apiClient.getFees(c.getName).map(f => c.convertAmount(f.getAmount(ti.feeMethod.get)))
-    }
-    tx <- a.asBitcoinLikeAccount().buildTransaction(false)
-      .sendToAddress(c.convertAmount(ti.amount), ti.recipient)
-      .pickInputs(BitcoinLikePickingStrategy.DEEP_OUTPUTS_FIRST, UnsignedInteger.MAX_VALUE.intValue())
-      .setFeesPerByte(feesPerByte)
-      .build()
-    v <- Bitcoin.newUnsignedTransactionView(tx, feesPerByte.toBigInt.asScala)
-  } yield v
+  private def createBTCTransaction(ti: BTCTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
+    for {
+      feesPerByte <- ti.feeAmount match {
+        case Some(amount) => Future.successful(c.convertAmount(amount))
+        case None => ClientFactory.apiClient.getFees(c.getName).map(f => c.convertAmount(f.getAmount(ti.feeMethod.get)))
+      }
+      tx <- a.asBitcoinLikeAccount().buildTransaction(false)
+        .sendToAddress(c.convertAmount(ti.amount), ti.recipient)
+        .pickInputs(BitcoinLikePickingStrategy.OPTIMIZE_SIZE, UnsignedInteger.MAX_VALUE.intValue())
+        .setFeesPerByte(feesPerByte)
+        .build()
+      v <- Bitcoin.newUnsignedTransactionView(tx, feesPerByte.toBigInt.asScala)
+    } yield v
+  }
 
-  private def createEthTransaction(ti: ETHTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext):
-  Future[UnsignedEthereumTransactionView] = for {
-    transactionBuilder <- ti.contract match {
-      case Some(contract) => createErc20Transaction(ti, a, c, contract)
-      case None => for {
-        gasLimit <- ti.gasLimit match {
-          case Some(amount) => Future.successful(amount)
-          case None => ClientFactory.apiClient.getGasLimit(c.getName, ti.contract.getOrElse(ti.recipient))
-        }
-      } yield a.asEthereumLikeAccount()
+  private def createETHTransaction(ti: ETHTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
+    for {
+      transactionBuilder <- ti.contract match {
+        case Some(contract) => erc20TransactionBuilder(ti, a, c, contract)
+        case None => ethereumTransactionBuilder(ti, a, c)
+      }
+      gasPrice <- ti.gasPrice match {
+        case Some(amount) => Future.successful(amount)
+        case None => ClientFactory.apiClient.getGasPrice(c.getName)
+      }
+      v <- transactionBuilder.setGasPrice(c.convertAmount(gasPrice)).build()
+    } yield UnsignedEthereumTransactionView(v)
+  }
+
+  private def ethereumTransactionBuilder(ti: ETHTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[EthereumLikeTransactionBuilder] = {
+    for {
+      gasLimit <- ti.gasLimit match {
+        case Some(amount) => Future.successful(amount)
+        case None => ClientFactory.apiClient.getGasLimit(c.getName, ti.contract.getOrElse(ti.recipient))
+      }
+    } yield {
+      a.asEthereumLikeAccount()
         .buildTransaction()
         .setGasLimit(c.convertAmount(gasLimit))
         .sendToAddress(c.convertAmount(ti.amount), ti.recipient)
     }
-    gasPrice <- ti.gasPrice match {
-      case Some(amount) => Future.successful(amount)
-      case None => ClientFactory.apiClient.getGasPrice(c.getName)
-    }
-    v <- transactionBuilder.setGasPrice(c.convertAmount(gasPrice)).build().map(UnsignedEthereumTransactionView(_))
-  } yield v
+  }
 
-  private def createErc20Transaction(ti: ETHTransactionInfo, a: core.Account, c: core.Currency, contract: String)(implicit ec: ExecutionContext):
-  Future[EthereumLikeTransactionBuilder] =
+  private def erc20TransactionBuilder(ti: ETHTransactionInfo, a: core.Account, c: core.Currency, contract: String)(implicit ec: ExecutionContext): Future[EthereumLikeTransactionBuilder] = {
     a.asEthereumLikeAccount().getERC20Accounts.asScala.find(_.getToken.getContractAddress == contract) match {
       case Some(erc20Account) =>
         erc20Account.getBalance().flatMap { balance =>
@@ -245,6 +262,26 @@ object Account extends Logging {
           }
         }
       case None => Future.failed(ERC20BalanceNotEnough(contract, 0, ti.amount))
+    }
+  }
+
+  private def createXRPTransaction(ti: XRPTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
+    val builder = a.asRippleLikeAccount().buildTransaction
+    ti.sendTo.foreach(sendTo => builder.sendToAddress(c.convertAmount(sendTo.amount), sendTo.address))
+    ti.wipeTo.foreach(builder.wipeToAddress)
+    ti.memos.foreach(builder.addMemo)
+    ti.destinationTag.foreach(builder.setDestinationTag)
+    builder.setFees(c.convertAmount(ti.fees))
+    builder.build().map(UnsignedRippleTransactionView.apply)
+  }
+
+  def createTransaction(transactionInfo: TransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
+    (transactionInfo, c.getWalletType) match {
+      case (ti: BTCTransactionInfo, WalletType.BITCOIN) => createBTCTransaction(ti, a, c)
+      case (ti: ETHTransactionInfo, WalletType.ETHEREUM) => createETHTransaction(ti, a, c)
+      case (ti: XRPTransactionInfo, WalletType.RIPPLE) => createXRPTransaction(ti, a, c)
+      case _ => Future.failed(new UnsupportedOperationException("Account type not supported, can't create transaction"))
+    }
   }
 
   def operation(uid: String, fullOp: Int, a: core.Account)(implicit ec: ExecutionContext): Future[Option[core.Operation]] = {
@@ -425,8 +462,7 @@ case class ERC20AccountView(
                            )
 
 object ERC20AccountView {
-  def apply(erc20Account: ERC20LikeAccount)
-           (implicit ec: ExecutionContext): Future[ERC20AccountView] = {
+  def fromERC20Account(erc20Account: ERC20LikeAccount)(implicit ec: ExecutionContext): Future[ERC20AccountView] = {
     erc20Account.getBalance().map { balance =>
       ERC20AccountView(
         erc20Account.getToken.getContractAddress,

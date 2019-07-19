@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.services
 
 import co.ledger.core.WalletType
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
-import co.ledger.wallet.daemon.controllers.TransactionsController.{BroadcastBTCTransactionRequest, BroadcastETHTransactionRequest, CreateBTCTransactionRequest, CreateETHTransactionRequest}
+import co.ledger.wallet.daemon.controllers.TransactionsController._
 import co.ledger.wallet.daemon.database.DefaultDaemonCache
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
 import co.ledger.wallet.daemon.models.Account._
@@ -34,6 +34,7 @@ class TransactionsService @Inject()(defaultDaemonCache: DefaultDaemonCache, mess
         val transactionInfoEither = wallet.getWalletType match {
           case WalletType.BITCOIN => Right(messageBodyManager.read[CreateBTCTransactionRequest](request))
           case WalletType.ETHEREUM => Right(messageBodyManager.read[CreateETHTransactionRequest](request))
+          case WalletType.RIPPLE => Right(messageBodyManager.read[CreateXRPTransactionRequest](request))
           case w => Left(CurrencyNotFoundException(w.name()))
         }
         transactionInfoEither match {
@@ -56,6 +57,9 @@ class TransactionsService @Inject()(defaultDaemonCache: DefaultDaemonCache, mess
             case WalletType.ETHEREUM =>
               val req = messageBodyManager.read[BroadcastETHTransactionRequest](request)
               account.broadcastETHTransaction(req.hexTx, req.hexSig, wallet.getCurrency)
+            case WalletType.RIPPLE =>
+              val req = messageBodyManager.read[BroadcastXRPTransactionRequest](request)
+              account.broadcastXRPTransaction(req.hexTx, req.hexSig, wallet.getCurrency)
             case w => Future.failed(CurrencyNotFoundException(w.name()))
           }
         } yield r
