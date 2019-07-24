@@ -39,7 +39,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
     val request = Request(
-      Method.Get,
+      Method.Post,
       s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit"
     ).host(host)
     val body = source.map(s => Map[String, String]("from" -> s)).getOrElse(Map[String, String]()) ++
