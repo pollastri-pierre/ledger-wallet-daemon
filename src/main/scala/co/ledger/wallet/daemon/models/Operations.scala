@@ -13,14 +13,7 @@ import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
 import scala.concurrent.Future
-/**
-  * The operation related functions.
-  *
-  * User: Ting Tu
-  * Date: 24-10-2018
-  * Time: 17:29
-  *
-  */
+
 object Operations {
   def confirmations(operation: core.Operation, wallet: core.Wallet): Future[Long] = {
     for {

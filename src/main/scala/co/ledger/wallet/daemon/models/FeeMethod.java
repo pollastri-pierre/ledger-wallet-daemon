@@ -1,12 +1,5 @@
 package co.ledger.wallet.daemon.models;
 
-/**
- * Method defines the type of fee.
- * <p>
- * User: Ting Tu
- * Date: 24-04-2018
- * Time: 16:43
- */
 public enum FeeMethod {
 
     SLOW, NORMAL, FAST;

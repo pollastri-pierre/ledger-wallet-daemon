@@ -8,9 +8,9 @@ import co.ledger.wallet.daemon.async.{MDCPropagatingExecutionContext, SerialExec
 import scala.concurrent.{ExecutionContext, Future}
 
 class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.ExecutionContext {
-  private implicit val context = ec
+  private implicit val context: ExecutionContext = ec
 
-  override def execute(runnable: core.Runnable): Unit = Future {runnable.run()}
+  override def execute(runnable: core.Runnable): Unit = Future { runnable.run() }
 
   override def delay(runnable: core.Runnable, millis: Long): Unit = {
     val timer = new Timer()
@@ -22,7 +22,7 @@ class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.Ex
 }
 
 object LedgerCoreExecutionContext {
-  def apply(ec: ExecutionContext) = new LedgerCoreExecutionContext(ec)
-  def newThreadPool() = apply(MDCPropagatingExecutionContext.Implicits.global)
-  def newSerialQueue() = apply(SerialExecutionContext.Implicits.global)
+  def apply(ec: ExecutionContext): LedgerCoreExecutionContext = new LedgerCoreExecutionContext(ec)
+  def newThreadPool(): LedgerCoreExecutionContext = apply(MDCPropagatingExecutionContext.Implicits.global)
+  def newSerialQueue(): LedgerCoreExecutionContext = apply(SerialExecutionContext.Implicits.global)
 }

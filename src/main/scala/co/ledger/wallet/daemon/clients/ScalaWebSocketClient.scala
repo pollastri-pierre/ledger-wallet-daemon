@@ -18,7 +18,7 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
   import ScalaWebSocketClient._
 
   override def connect(url: String, connection: WebSocketConnection): Unit = {
-    if(connection.getConnectionId > 0 && sessions.containsKey(connection.getConnectionId)) {
+    if (connection.getConnectionId > 0 && sessions.containsKey(connection.getConnectionId)) {
       val session = sessions.get(connection.getConnectionId)
       warn(LogMsgMaker.newInstance("Connection already exist, ignore request")
         .append("url", url)
@@ -47,8 +47,7 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
   }
 
   override def send(connection: WebSocketConnection, data: String): Unit = {
-
-    if(!sessions.containsKey(connection.getConnectionId)) {
+    if (!sessions.containsKey(connection.getConnectionId)) {
       warn(LogMsgMaker.newInstance("Fail to send data, no connection")
         .append("connection", connection.getConnectionId)
         .append("data", data)
@@ -71,8 +70,7 @@ class ScalaWebSocketClient extends co.ledger.core.WebSocketClient with Logging{
     } else {
       try {
         @Nullable val session = sessions.remove(connection.getConnectionId)
-        //noinspection ScalaStyle
-        if(session != null) session.close()
+        if (session != null) session.close()
         info(LogMsgMaker.newInstance("Disconnecting, session closed")
           .append("session", session.getId)
           .append("connection", connection.getConnectionId)

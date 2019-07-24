@@ -79,7 +79,7 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   def getNextBatchAccountOperations( next: UUID,
                                      fullOp: Int, accountInfo: AccountInfo): Future[PackedOperationsView] = {
-    withAccountAndWalletAndPool(accountInfo){
+    withAccountAndWalletAndPool(accountInfo) {
       case (account, wallet, pool) =>
         val candidate = opsCache.getOperationCandidate(next)
         for {

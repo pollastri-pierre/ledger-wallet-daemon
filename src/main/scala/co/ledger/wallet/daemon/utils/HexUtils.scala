@@ -6,5 +6,5 @@ object HexUtils {
   private val PARSE_RADIX = 16
 
   def valueOf(array: Array[Byte]): String = array.map("%02X" format _).mkString
-  def valueOf(string: String): Array[Byte] =  string.sliding(SLIDING_SIZE, SLIDING_STEP).toArray.map(Integer.parseInt(_, PARSE_RADIX).toByte)
+  def valueOf(string: String): Array[Byte] = string.sliding(SLIDING_SIZE, SLIDING_STEP).toArray.map(Integer.parseInt(_, PARSE_RADIX).toByte)
 }

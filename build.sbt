@@ -3,83 +3,36 @@ name := "daemon"
 version := "0.0.0"
 
 organization := "co.ledger"
+
 scalaVersion := "2.12.8"
 
-enablePlugins(JavaServerAppPackaging)
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
+
+mainClass in Compile := Some("co.ledger.wallet.daemon.Server")
 
 // For cancelable processes in interactive shell
 cancelable in Global := true
 
 // To close the server stream when we run it in interactive shell
 fork in run := true
+fork in Test := true
 
-concurrentRestrictions in Global += Tags.limit(Tags.Test, 1)
-parallelExecution in Test := false
+// For correct test ordering in integration tests
+parallelExecution in Test := true
 parallelExecution in IntegrationTest := false
-testForkedParallel in Test := false
-testForkedParallel in IntegrationTest := false
-testOptions in Test := Seq(Tests.Argument(TestFrameworks.JUnit, "-a"))
-mainClass in Compile := Some("co.ledger.wallet.daemon.Server")
+
+// We don't need to run the tests again when we call assembly
 test in assembly := {}
-mappings in (Compile, packageDoc) := Seq()
 
-lazy val versions = new {
-  val andrebeat = "0.4.0"
-  val bitcoinj  = "0.14.4"
-  val finatra   = "2.12.0"
-  val guice     = "4.0"
-  val h2        = "1.4.192"
-  val logback   = "1.1.7"
-  val postgre   = "9.3-1100-jdbc4"
-  val slick     = "3.2.1"
-  val sqlite    = "3.7.15-M1"
-  val cats      = "1.5.0"
-}
+// Use test configuration files
+// Use test fixtures and resources in integration tests
+unmanagedResourceDirectories in IntegrationTest += baseDirectory.value / "src" / "test" / "resources"
 
-libraryDependencies ++= Seq(
-  "org.typelevel" %% "cats-core" % versions.cats,
+// -a: Show full stack traces
+// -q: Hide logs for successful tests
+testOptions in Test := Seq(Tests.Argument(TestFrameworks.JUnit, "-a", "-q"))
 
-  "com.typesafe.slick"  %% "slick"              % versions.slick,
-  "com.typesafe.slick"  %% "slick-hikaricp"     % versions.slick,
-  "org.postgresql"      %  "postgresql"         % versions.postgre,
-  "org.xerial"          %  "sqlite-jdbc"        % versions.sqlite,
-  "com.h2database"      %  "h2"                 % versions.h2,
-
-  "ch.qos.logback"      %  "logback-classic"    % versions.logback,
-  "org.bitcoinj"        %  "bitcoinj-core"      % versions.bitcoinj,
-  "io.github.andrebeat" %% "scala-pool"         % versions.andrebeat,
-
-  "javax.websocket"             % "javax.websocket-api"     % "1.1"   % "provided",
-  "org.glassfish.tyrus.bundles" % "tyrus-standalone-client" % "1.13.1",
-
-  "com.twitter" %% "finatra-http"     % versions.finatra,
-  "com.twitter" %% "finatra-jackson"  % versions.finatra,
-
-  "com.twitter" %% "finatra-http"     % versions.finatra            % "test",
-  "com.twitter" %% "finatra-jackson"  % versions.finatra            % "test",
-  "com.twitter" %% "inject-server"    % versions.finatra            % "test",
-  "com.twitter" %% "inject-app"       % versions.finatra            % "test",
-  "com.twitter" %% "inject-core"      % versions.finatra            % "test",
-  "com.twitter" %% "inject-modules"   % versions.finatra            % "test",
-
-  "com.google.inject.extensions" % "guice-testlib" % versions.guice % "test",
-
-  "com.twitter" %% "finatra-http"     % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "finatra-jackson"  % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-server"    % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-app"       % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-core"      % versions.finatra % "test" classifier "tests",
-  "com.twitter" %% "inject-modules"   % versions.finatra % "test" classifier "tests",
-
-
-  "org.scalacheck"  %% "scalacheck"       % "1.13.4"  % "test",
-  "org.scalatest"   %% "scalatest"        %  "3.0.0"  % "test",
-  "org.specs2"      %% "specs2-mock"      % "2.4.17"  % "test",
-  "junit"           %  "junit"            % "4.12"    % "test",
-  "com.novocode"    %  "junit-interface"  % "0.11"    % "test",
-  "org.mockito"     %  "mockito-core"     % "1.9.5"   % "test"
-)
+enablePlugins(JavaServerAppPackaging)
 
 // Inspired by https://tpolecat.github.io/2017/04/25/scalac-flags.html
 scalacOptions ++= Seq(
@@ -121,6 +74,74 @@ scalacOptions ++= Seq(
   "-Ywarn-unused:privates"            // Warn if a private member is unused.
 )
 
+// scalastyle:off
+lazy val versions = new {
+  val andrebeat  = "0.4.0"
+  val bitcoinj   = "0.14.4"
+  val cats       = "1.5.0"
+  val finatra    = "2.12.0"
+  val guice      = "4.0"
+  val junit      = "4.12"
+  val junitI     = "0.11"
+  val h2         = "1.4.192"
+  val logback    = "1.1.7"
+  val mockito    = "1.9.5"
+  val postgres   = "9.3-1100-jdbc4"
+  val scalacheck = "1.13.4"
+  val scalatest  = "3.0.0"
+  val slick      = "3.2.1"
+  val specs2     = "2.4.17"
+  val sqlite     = "3.7.15-M1"
+  val tyrus      = "1.13.1"
+  val websocket  = "1.1"
+}
+// scalastyle:on
+
+lazy val root = (project in file("."))
+  .enablePlugins(BuildInfoPlugin)
+  .configs(IntegrationTest)
+  .settings(
+    Defaults.itSettings,
+    buildInfoKeys := Seq[BuildInfoKey](version, git.gitHeadCommit),
+    buildInfoPackage := "buildinfo",
+    libraryDependencies ++= Seq(
+      "io.github.andrebeat"          %% "scala-pool"             % versions.andrebeat,
+      "org.bitcoinj"                 %  "bitcoinj-core"          % versions.bitcoinj,
+      "org.typelevel"                %% "cats-core"              % versions.cats,
+      "com.twitter"                  %% "finatra-http"           % versions.finatra,
+      "com.twitter"                  %% "finatra-jackson"        % versions.finatra,
+      "com.h2database"               %  "h2"                     % versions.h2,
+      "ch.qos.logback"               %  "logback-classic"        % versions.logback,
+      "org.postgresql"               %  "postgresql"             % versions.postgres,
+      "com.typesafe.slick"           %% "slick"                  % versions.slick,
+      "com.typesafe.slick"           %% "slick-hikaricp"         % versions.slick,
+      "org.xerial"                   %  "sqlite-jdbc"            % versions.sqlite,
+      "org.glassfish.tyrus.bundles"  % "tyrus-standalone-client" % versions.tyrus,
+      "javax.websocket"              % "javax.websocket-api"     % versions.websocket % "provided",
+
+      // Tests dependencies
+      "org.specs2"                   %% "specs2-mock"            % versions.specs2     % "it",
+      "org.mockito"                  %  "mockito-core"           % versions.mockito    % "it",
+      "com.google.inject.extensions" %  "guice-testlib"          % versions.guice      % "it",
+      "com.novocode"                 %  "junit-interface"        % versions.junitI     % "it",
+      "org.scalacheck"               %% "scalacheck"             % versions.scalacheck % "it",
+      "org.scalatest"                %% "scalatest"              % versions.scalatest  % "it",
+      "junit"                        %  "junit"                  % versions.junit      % "it",
+      "com.twitter"                  %% "finatra-http"           % versions.finatra    % "it",
+      "com.twitter"                  %% "finatra-jackson"        % versions.finatra    % "it",
+      "com.twitter"                  %% "inject-server"          % versions.finatra    % "it",
+      "com.twitter"                  %% "inject-app"             % versions.finatra    % "it",
+      "com.twitter"                  %% "inject-core"            % versions.finatra    % "it",
+      "com.twitter"                  %% "inject-modules"         % versions.finatra    % "it",
+      "com.twitter"                  %% "finatra-http"           % versions.finatra    % "it" classifier "tests",
+      "com.twitter"                  %% "finatra-jackson"        % versions.finatra    % "it" classifier "tests",
+      "com.twitter"                  %% "inject-server"          % versions.finatra    % "it" classifier "tests",
+      "com.twitter"                  %% "inject-app"             % versions.finatra    % "it" classifier "tests",
+      "com.twitter"                  %% "inject-core"            % versions.finatra    % "it" classifier "tests",
+      "com.twitter"                  %% "inject-modules"         % versions.finatra    % "it" classifier "tests"
+    )
+  )
+
 libraryDependencies ++= Seq(
   compilerPlugin("com.github.ghik" %% "silencer-plugin" % "1.3.1"),
   "com.github.ghik" %% "silencer-lib" % "1.3.1" % Provided
@@ -128,8 +149,10 @@ libraryDependencies ++= Seq(
 
 // For sbt plugin sbt-buildinfo
 enablePlugins(BuildInfoPlugin)
+
 buildInfoKeys := Seq[BuildInfoKey](
   name,
   version,
   "commitHash" -> sys.env.getOrElse("COMMIT_HASH", "unknown-commit-hash"))
+
 buildInfoPackage := "co.ledger.wallet.daemon"

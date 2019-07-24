@@ -490,7 +490,7 @@ case class AccountDerivationView(
 case class ExtendedDerivationView(
                                    @JsonProperty("path") path: String,
                                    @JsonProperty("owner") owner: String,
-                                   @JsonProperty("extended_key") extKey: Option[String],
+                                   @JsonProperty("extended_key") extKey: Option[String]
                                  )
 
 case class AccountExtendedDerivationView(

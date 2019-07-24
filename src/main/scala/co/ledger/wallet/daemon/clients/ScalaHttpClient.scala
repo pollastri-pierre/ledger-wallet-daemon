@@ -4,7 +4,7 @@ import java.io.{BufferedInputStream, DataOutputStream}
 import java.net.{HttpURLConnection, InetSocketAddress, URL}
 import java.util
 
-import co.ledger.core.{ErrorCode, HttpMethod, HttpReadBodyResult, HttpRequest}
+import co.ledger.core.{ErrorCode, HttpMethod, HttpReadBodyResult, HttpRequest, HttpUrlConnection}
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
 import com.twitter.inject.Logging
@@ -13,9 +13,9 @@ import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-//noinspection ScalaStyle
 class ScalaHttpClient(implicit val ec: ExecutionContext) extends co.ledger.core.HttpClient with Logging {
-import ScalaHttpClient._
+
+  import ScalaHttpClient._
 
   override def execute(request: HttpRequest): Unit = Future {
     val connection = DaemonConfiguration.proxy match {
@@ -51,7 +51,7 @@ import ScalaHttpClient._
     for ((key, list) <- connection.getHeaderFields.asScala) {
       headers.put(key, list.get(list.size() - 1))
     }
-    val proxy = new co.ledger.core.HttpUrlConnection() {
+    val proxy: HttpUrlConnection = new co.ledger.core.HttpUrlConnection() {
       private val buffer = new Array[Byte](PROXY_BUFFER_SIZE)
 
       override def getStatusCode: Int = statusCode

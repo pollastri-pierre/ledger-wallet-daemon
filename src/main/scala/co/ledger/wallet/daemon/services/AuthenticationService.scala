@@ -23,12 +23,13 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
   def authorize(request: Request)(implicit ec: ExecutionContext): Future[Unit] = {
     attemptAuthorize(request).rescue({
       case ex: UserNotFoundException =>
-        if (DaemonConfiguration.isWhiteListDisabled)
-          daemonCache.createUser(HexUtils.valueOf(request.authContext.pubKey), 0).asTwitter().flatMap({_ =>
+        if (DaemonConfiguration.isWhiteListDisabled) {
+          daemonCache.createUser(HexUtils.valueOf(request.authContext.pubKey), 0).asTwitter().flatMap({ _ =>
             attemptAuthorize(request)
           })
-        else
+        } else {
           Future.exception(AuthenticationFailedException(ex.getMessage))
+        }
       case error => throw error
     })
   }
@@ -84,5 +85,4 @@ object AuthenticationService {
     }
     def setUser(request: Request, user: User): Unit = request.ctx.update[AuthentifiedUser](UserField, AuthentifiedUser(user))
   }
-
 }

@@ -64,7 +64,7 @@ class OperationCache extends Logging with GenCache {
     *
     * @param id the UUID of query record candidate.
     * @return a operation query record.
-    * @throws OperationNotFoundException when there is no record found with the UUID.
+    * @throws co.ledger.wallet.daemon.exceptions.OperationNotFoundException when there is no record found with the UUID.
     */
   def getOperationCandidate(id: UUID): AtomicRecord = {
     cache.getOrElse(id, nexts.get(id) match {
@@ -98,7 +98,7 @@ class OperationCache extends Logging with GenCache {
     *
     * @param id the UUID of query record, the record should already exist.
     * @return the operation query record.
-    * @throws OperationNotFoundException when there is no record found with the UUID.
+    * @throws co.ledger.wallet.daemon.exceptions.OperationNotFoundException when there is no record found with the UUID.
     */
   def getPreviousOperationRecord(id: UUID): AtomicRecord = {
     cache.getOrElse(id, nexts.get(id) match {
@@ -185,21 +185,21 @@ class OperationCache extends Logging with GenCache {
     new AccountTree(index, Utils.newConcurrentSet[UUID] += operation)
   }
 
-  class AccountTree(val index: Int, val operations:  mutable.Set[UUID]) {
+  class AccountTree(val index: Int, val operations: mutable.Set[UUID]) {
 
     def containsOperation(operationId: UUID): Boolean = operations.contains(operationId)
 
     def insertOperation(operationId: UUID): operations.type = operations += operationId
   }
 
-  class AtomicRecord (val id: UUID,
-                      val poolId: Long,
-                      val walletName: Option[String],
-                      val accountIndex: Option[Int],
-                      val batch: Int,
-                      private val ofst: AtomicLong,
-                      val next: Option[UUID],
-                      val previous: Option[UUID]) {
+  class AtomicRecord(val id: UUID,
+                     val poolId: Long,
+                     val walletName: Option[String],
+                     val accountIndex: Option[Int],
+                     val batch: Int,
+                     private val ofst: AtomicLong,
+                     val next: Option[UUID],
+                     val previous: Option[UUID]) {
 
     /**
       * Method to increment the offset. This operation is thread safe.

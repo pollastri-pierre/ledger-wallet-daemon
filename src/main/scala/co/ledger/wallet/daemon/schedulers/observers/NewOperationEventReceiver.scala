@@ -15,7 +15,7 @@ class NewOperationEventReceiver(private val poolId: Long, private val opsCache: 
         poolId,
         event.getPayload.getString(Account.EV_NEW_OP_WALLET_NAME),
         event.getPayload.getInt(Account.EV_NEW_OP_ACCOUNT_INDEX))) match {
-        case Success(_) => //do nothing
+        case Success(_) => // Do nothing
         case Failure(e) => error("Failed to update offset with exception", e)
       }
     }

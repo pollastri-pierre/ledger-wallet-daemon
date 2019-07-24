@@ -13,7 +13,7 @@ class AccountCreationFilter @Inject()(messageBodyManager: MessageBodyManager) ex
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     val accountCreationBody = messageBodyManager.read[AccountDerivationView](request)
     accountCreationBody.derivations.foreach { derivation =>
-      if(derivation.pubKey.isEmpty) {
+      if (derivation.pubKey.isEmpty) {
         throw new BadRequestException("derivations.pub_key: field is required")
       } else if (derivation.chainCode.isEmpty) { throw new BadRequestException("derivations.chain_code: field is required") }
     }
@@ -27,7 +27,7 @@ class AccountExtendedCreationFilter @Inject()(messageBodyManager: MessageBodyMan
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     val accountCreationBody = messageBodyManager.read[AccountExtendedDerivationView](request)
     accountCreationBody.derivations.foreach { derivation =>
-      if(derivation.extKey.isEmpty) {
+      if (derivation.extKey.isEmpty) {
         throw new BadRequestException("derivations.extended_key: field is required")
       }
     }

@@ -96,5 +96,4 @@ object WalletsController {
     @MethodValidation
     def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
   }
-
 }

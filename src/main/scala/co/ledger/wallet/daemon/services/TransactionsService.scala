@@ -15,14 +15,6 @@ import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/**
-  * Business logic for transaction operations.
-  *
-  * User: Ting Tu
-  * Date: 24-04-2018
-  * Time: 14:14
-  *
-  */
 @Singleton
 class TransactionsService @Inject()(defaultDaemonCache: DefaultDaemonCache, messageBodyManager: MessageBodyManager) extends DaemonService {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global

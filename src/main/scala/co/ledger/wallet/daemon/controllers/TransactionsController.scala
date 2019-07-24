@@ -14,14 +14,6 @@ import javax.inject.Inject
 
 import scala.concurrent.ExecutionContext
 
-/**
-  * The controller for transaction operations.
-  *
-  * User: Ting Tu
-  * Date: 24-04-2018
-  * Time: 11:07
-  *
-  */
 class TransactionsController @Inject()(transactionsService: TransactionsService) extends Controller {
   implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
@@ -68,7 +60,7 @@ object TransactionsController {
                                 request: Request
                                ) extends RequestWithUser
   {
-    def accountInfo = AccountInfo(account_index, wallet_name, pool_name, user.pubKey)
+    def accountInfo: AccountInfo = AccountInfo(account_index, wallet_name, pool_name, user.pubKey)
   }
 
   trait BroadcastTransactionRequest
@@ -138,7 +130,7 @@ object TransactionsController {
                                          fees_per_byte: Option[String],
                                          fees_level: Option[String],
                                          amount: String,
-                                         exclude_utxos: Option[Map[String, Int]],
+                                         exclude_utxos: Option[Map[String, Int]]
                                         ) extends CreateTransactionRequest {
     def amountValue: BigInt = BigInt(amount)
     def feesPerByteValue: Option[BigInt] = fees_per_byte.map(BigInt(_))

@@ -32,7 +32,7 @@ object DaemonConfiguration {
 
   } else { List[(String, String)]() }
 
-  val whiteListUsers: Seq[(String, Int)] = if (config.hasPath("whitelist")){
+  val whiteListUsers: Seq[(String, Int)] = if (config.hasPath("whitelist")) {
     val usersConfig = config.getConfigList("whitelist")
     val users = new ListBuffer[(String, Int)]()
     for (i <- 0 until usersConfig.size()) {
@@ -65,7 +65,7 @@ object DaemonConfiguration {
   val synchronizationInterval: (Int, Int) = (
     if (config.hasPath("synchronization.initial_delay_in_seconds")) { config.getInt("synchronization.initial_delay_in_seconds") }
     else { DEFAULT_SYNC_INITIAL_DELAY },
-    if(config.hasPath("synchronization.interval_in_hours")) { config.getInt("synchronization.interval_in_hours") }
+    if (config.hasPath("synchronization.interval_in_hours")) { config.getInt("synchronization.interval_in_hours") }
     else { DEFAULT_SYNC_INTERVAL })
 
   val realTimeObserverOn: Boolean =

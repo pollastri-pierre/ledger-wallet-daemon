@@ -57,7 +57,7 @@ object Deserializers {
     }
 
     private val mapper: ObjectMapper = new ObjectMapper() with ScalaObjectMapper
+
     mapper.registerModule(DefaultScalaModule)
   }
-
 }

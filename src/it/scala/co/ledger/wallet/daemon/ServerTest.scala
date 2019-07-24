@@ -4,13 +4,12 @@ import java.nio.charset.StandardCharsets
 import java.util.{Base64, Date}
 
 import co.ledger.wallet.daemon.services.ECDSAService
-import co.ledger.wallet.daemon.utils.FixturesUtils
-import co.ledger.wallet.daemon.utils.HexUtils
+import co.ledger.wallet.daemon.utils.{FixturesUtils, HexUtils}
 import com.twitter.finatra.http.EmbeddedHttpServer
 import com.twitter.inject.server.FeatureTest
 import org.bitcoinj.core.Sha256Hash
 
-class AuthenticationFeatureTest extends FeatureTest {
+class ServerTest extends FeatureTest {
   override val server = new EmbeddedHttpServer(new ServerImpl)
 
   test("Authentication#Basic Authentication for demo users") {

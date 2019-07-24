@@ -3,24 +3,100 @@ version: 2.1
 orbs:
   docker: ledger/docker@volatile
 
+aliases:
+  - &filter_all_tags
+    tags:
+      only: /.*/
+  - &dependencies_cache
+    keys:
+      - wallet-daemon-{{ .Branch }}-{{ checksum "build.sbt" }}
+      - wallet-daemon-{{ .Branch }}-
+      - wallet-daemon-
+
+jobs:
+  compile:
+    docker:
+      - image: ledgerhq/sbt-openjdk-8
+        environment:
+          JVM_OPTS: -Xmx3200m
+          TERM: dumb
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
+    steps:
+      - checkout
+      - restore_cache: *dependencies_cache
+      - run:
+          name: Compile
+          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt compile test:compile it:compile
+      - save_cache:
+          paths:
+            - target
+            - project/target
+            - .ivy2
+            - .sbt
+          key: wallet-daemon-{{ .Branch }}-{{ checksum "build.sbt" }}
+      - persist_to_workspace:
+          root: /root/project
+          paths:
+            - .ivy2
+            - .sbt
+
+  scala_linter:
+    docker:
+      - image: ledgerhq/sbt-openjdk-8
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
+    steps:
+      - checkout
+      - run:
+          name: Run scalastyle
+          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt scalastyle
+
+  unit_tests:
+    docker:
+      - image: ledgerhq/sbt-openjdk-8
+        environment:
+          JVM_OPTS: -Xmx3200m
+          TERM: dumb
+        auth:
+          username: $DOCKER_USERNAME
+          password: $DOCKER_PASSWORD
+    steps:
+      - checkout
+      - restore_cache: *dependencies_cache
+      - run:
+          name: Run unit tests
+          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt test
+
+
 workflows:
   build_test_and_publish:
     jobs:
+      - compile:
+          filters: *filter_all_tags
+      - scala_linter:
+          filters: *filter_all_tags
+      - unit_tests:
+          requires:
+            - compile
+          filters: *filter_all_tags
       - docker/build_image:
+          requires:
+            - compile
+          docker_login: true
           after_checkout:
+            - attach_workspace:
+                at: /home/circleci/project
             - run:
                 name: Set version environment variable
                 command: echo "export COMMIT_HASH=$(git rev-parse HEAD)" >> $BASH_ENV
-          docker_build_args: --build-arg COMMIT_HASH
-          filters:
-            tags:
-              only: /v.*/
+          filters: *filter_all_tags
       - docker/test_image:
           requires:
             - docker/build_image
-          filters:
-            tags:
-              only: /v.*/
+          filters: *filter_all_tags
       - docker/publish_image:
           requires:
             - docker/test_image

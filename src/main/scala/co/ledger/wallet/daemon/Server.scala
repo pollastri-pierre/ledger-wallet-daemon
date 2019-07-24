@@ -5,20 +5,19 @@ import co.ledger.wallet.daemon.filters._
 import co.ledger.wallet.daemon.mappers._
 import co.ledger.wallet.daemon.modules.{DaemonCacheModule, DaemonJacksonModule}
 import co.ledger.wallet.daemon.utils.NativeLibLoader
+import com.google.inject.Module
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.{AccessLoggingFilter, CommonFilters, LoggingMDCFilter, TraceIdMDCFilter}
 import com.twitter.finatra.http.routing.HttpRouter
 
-object Server extends ServerImpl {
-
-}
+object Server extends ServerImpl
 
 class ServerImpl extends HttpServer {
 
-  override def jacksonModule = DaemonJacksonModule
+  override def jacksonModule: Module = DaemonJacksonModule
 
-  override val modules = Seq(DaemonCacheModule)
+  override val modules: Seq[Module] = Seq(DaemonCacheModule)
 
   override protected def configureHttp(router: HttpRouter): Unit =
     router

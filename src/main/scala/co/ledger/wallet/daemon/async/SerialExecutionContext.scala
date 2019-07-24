@@ -6,7 +6,6 @@ object SerialExecutionContext {
   object Implicits{
     implicit lazy val global: ExecutionContext = SerialExecutionContextWrapper(ExecutionContext.Implicits.global)
   }
-
 }
 
 class SerialExecutionContextWrapper(implicit val ec: ExecutionContext) extends ExecutionContext with MDCPropagatingExecutionContext {

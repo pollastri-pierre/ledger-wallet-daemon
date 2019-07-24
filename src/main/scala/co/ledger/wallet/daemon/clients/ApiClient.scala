@@ -14,17 +14,10 @@ import javax.inject.Singleton
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
 
-/**
-  * Client for request to blockchain explorers.
-  *
-  * User: Ting Tu
-  * Date: 24-04-2018
-  * Time: 14:32
-  *
-  */
 // TODO: Map response from service to be more readable
 @Singleton
 class ApiClient(implicit val ec: ExecutionContext) extends Logging {
+
   import ApiClient._
 
   def getFees(currencyName: String): Future[FeeInfo] = {
@@ -33,7 +26,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     val request = Request(Method.Get, path).host(host)
     service(request).map { response =>
       mapper.parse[FeeInfo](response)
-    }.asScala
+    }.asScala()
   }
 
   def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
@@ -52,7 +45,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         info(s"Failed to estimate gas limit, using default: Request=${request.contentString} ; Response=${response.contentString}")
         defaultGasLimit
       })
-    }.asScala
+    }.asScala()
   }
 
   def getGasPrice(currencyName: String): Future[BigInt] = {
@@ -62,12 +55,12 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 
     service(request).map { response =>
       mapper.parse[GasPrice](response).price
-    }.asScala
+    }.asScala()
   }
 
   private val mapper: FinatraObjectMapper = FinatraObjectMapper.create()
   private val client = Http.client.withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
-  private val services: Map[String,(String, Service[Request, Response])] =
+  private val services: Map[String, (String, Service[Request, Response])] =
     DaemonConfiguration.explorer.api.paths
       .map { case(currency, path) =>
         val p = path.filterPrefix
@@ -99,7 +92,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
       "zcash" -> "/blockchain/v2/zec/fees",
       "ethereum" -> "/blockchain/v3/fees",
       "ethereum_classic" -> "/blockchain/v3/fees",
-      "ethereum_ropsten" -> "/blockchain/v3/fees",
+      "ethereum_ropsten" -> "/blockchain/v3/fees"
     )
   }
   private val defaultGasLimit = BigInt(200000)

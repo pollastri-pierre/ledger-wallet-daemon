@@ -105,7 +105,7 @@ trait DaemonCache {
     withUser(poolInfo.pubKey)(_.deletePool(poolInfo.poolName))
 
 
-  //**************** user ***************
+  // **************** user ***************
   def withUser[T](pubKey: String)(f: User => Future[T])(implicit ec: ExecutionContext): Future[T] =
     getUser(pubKey).flatMap {
       case Some(user) => f(user)

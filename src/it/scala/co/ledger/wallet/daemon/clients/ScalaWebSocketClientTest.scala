@@ -4,6 +4,7 @@ import java.util.concurrent.{Executors, TimeUnit}
 
 import co.ledger.core.{ErrorCode, WebSocketConnection}
 import com.twitter.concurrent.NamedPoolThreadFactory
+import com.twitter.inject.Logging
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
@@ -30,17 +31,17 @@ class ScalaWebSocketClientTest extends AssertionsForJUnit {
 
   }
 
-  class TestWebSocketConnection extends WebSocketConnection {
+  class TestWebSocketConnection extends WebSocketConnection with Logging {
     override def onConnect(connectionId: Int): Unit = {
       conId = connectionId
-      println(s"Connected with id $connectionId")
+      info(s"Connected with id $connectionId")
     }
 
-    override def onClose(): Unit = println("Close connection")
+    override def onClose(): Unit = info("Close connection")
 
-    override def onMessage(data: String): Unit = println(s"Echo message: $data")
+    override def onMessage(data: String): Unit = info(s"Echo message: $data")
 
-    override def onError(code: ErrorCode, message: String): Unit = println(s"Error: $code, Message: $message")
+    override def onError(code: ErrorCode, message: String): Unit = error(s"Error: $code, Message: $message")
 
     override def getConnectionId: Int = conId
 

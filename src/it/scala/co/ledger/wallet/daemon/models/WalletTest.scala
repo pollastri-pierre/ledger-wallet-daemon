@@ -2,15 +2,15 @@ package co.ledger.wallet.daemon.models
 
 import java.util.UUID
 
+import co.ledger.core
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.models.Account._
+import co.ledger.wallet.daemon.models.Currency.RichCoreCurrency
+import co.ledger.wallet.daemon.models.Wallet.RichCoreWallet
+import co.ledger.wallet.daemon.utils.NativeLibLoader
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
-import co.ledger.core
-import Currency.RichCoreCurrency
-import Wallet.RichCoreWallet
-import co.ledger.wallet.daemon.utils.NativeLibLoader
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext}

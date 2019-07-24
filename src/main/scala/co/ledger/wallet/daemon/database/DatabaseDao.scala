@@ -32,7 +32,7 @@ class DatabaseDao @Inject()(db: Database) extends Logging {
         val maxVersion = Migrations.keys.toArray.sortWith(_ > _).head
 
         def migrate(version: Int, maxVersion: Int): Future[Unit] = {
-          if(version > maxVersion) {
+          if (version > maxVersion) {
             info(s"Database version up to date at $maxVersion")
             Future.unit
           } else {
