@@ -30,7 +30,7 @@ object Operations {
           case e: EthereumTransactionView => e.copy(erc20 = Some(ERC20.from(erc20Operation)))
           case _ => throw InvalidCurrencyForErc20Operation()
       }
-      view.copy(transaction = tvOpt)
+      view.copy(opType = erc20Operation.getOperationType, transaction = tvOpt)
     }
   }
 
