@@ -26,7 +26,7 @@ class StatusController extends Controller {
 }
 
 object StatusController {
-  case class Status(engine_version: String)
+  case class Status(engine_version: String, status: String = "OK")
 
   case class VersionResponse(name: String, commitHash: String, libcore: String, explorers: DaemonConfiguration.ExplorerConfig)
 }
