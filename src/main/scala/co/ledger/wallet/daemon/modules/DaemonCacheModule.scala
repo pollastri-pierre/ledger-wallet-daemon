@@ -47,6 +47,18 @@ object DaemonCacheModule extends TwitterModule {
       }
     }
 
+    def startSynchronization(): Unit = {
+      val scheduler = new ScheduledThreadPoolTimer(
+        poolSize = 1,
+        threadFactory = new NamedPoolThreadFactory("scheduler-thread-pool")
+      )
+      scheduler.schedule(
+        Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1),
+        Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))(synchronizationTask())
+      info(s"Scheduled synchronization job: initial start in ${DaemonConfiguration.synchronizationInterval._1} seconds, " +
+        s"interval ${DaemonConfiguration.synchronizationInterval._2} hours")
+    }
+
     val usersService = injector.instance[UsersService](classOf[UsersService])
     DaemonConfiguration.adminUsers.map { user =>
       val existingUser = Await.result(usersService.user(user._1, user._2), 1.minutes)
@@ -57,23 +69,18 @@ object DaemonCacheModule extends TwitterModule {
       if (existingUser.isEmpty) Await.result(usersService.createUser(user._1, user._2), 1.minutes)
     }
 
+    if (DaemonConfiguration.updateWalletConfig) {
+      Await.result(updateWalletConfig(), 5.minutes)
+    }
+    startSynchronization()
+  }
+
+  private def updateWalletConfig(): Future[Unit] = {
     for {
       users <- provideDaemonCache.getUsers
-      pools <- Future.sequence(users.map(_.pools())).map(_.flatten)
-    } yield pools.map { pool =>
-      pool.wallets.map ( _.map { wallet =>
-        pool.updateWalletConfig(wallet)
-      })
-    }
-
-    val scheduler = new ScheduledThreadPoolTimer(
-      poolSize = 1,
-      threadFactory = new NamedPoolThreadFactory("scheduler-thread-pool")
-    )
-    scheduler.schedule(
-      Time.fromSeconds(DaemonConfiguration.synchronizationInterval._1),
-      Duration(DaemonConfiguration.synchronizationInterval._2, TimeUnit.HOURS))(synchronizationTask())
-    info(s"Scheduled synchronization job: initial start in ${DaemonConfiguration.synchronizationInterval._1} seconds, " +
-      s"interval ${DaemonConfiguration.synchronizationInterval._2} hours")
+      pools <- Future.traverse(users)(_.pools()).map(_.flatten)
+      poolWallets <- Future.traverse(pools)(pool => pool.wallets.map((pool, _)))
+      _ <- Future.sequence(poolWallets.flatMap { case (pool, wallets) => wallets.map(pool.updateWalletConfig) })
+    } yield ()
   }
 }

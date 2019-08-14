@@ -62,6 +62,8 @@ object DaemonConfiguration {
 
   val isWhiteListDisabled: Boolean = if (!config.hasPath("disable_whitelist")) false else config.getBoolean("disable_whitelist")
 
+  val updateWalletConfig: Boolean = if (config.hasPath("update_wallet_config")) config.getBoolean("update_wallet_config") else false
+
   val synchronizationInterval: (Int, Int) = (
     if (config.hasPath("synchronization.initial_delay_in_seconds")) { config.getInt("synchronization.initial_delay_in_seconds") }
     else { DEFAULT_SYNC_INITIAL_DELAY },
