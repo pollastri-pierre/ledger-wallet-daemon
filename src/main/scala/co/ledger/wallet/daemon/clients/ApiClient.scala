@@ -31,9 +31,11 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 
   def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
+
+    val uri = s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit"
     val request = Request(
       Method.Post,
-      s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit"
+      uri
     ).host(host)
     val body = source.map(s => Map[String, String]("from" -> s)).getOrElse(Map[String, String]()) ++
       inputData.map(d => Map[String, String]("data" -> s"0x${HexUtils.valueOf(d)}")).getOrElse(Map[String, String]())
@@ -41,10 +43,16 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     request.setContentType("application/json")
 
     service(request).map { response =>
-      Try(mapper.parse[GasLimit](response).limit).getOrElse({
-        info(s"Failed to estimate gas limit, using default: Request=${request.contentString} ; Response=${response.contentString}")
-        defaultGasLimit
-      })
+      Try(mapper.parse[GasLimit](response).limit).fold(
+        _ => {
+          info(s"Failed to estimate gas limit, using default: Request=${request.contentString} ; Response=${response.contentString}")
+          defaultGasLimit
+        },
+        result => {
+          info(s"getGasLimit uri=${host}${uri} request=${request.contentString} response:${response.contentString}")
+          result
+        }
+      )
     }.asScala()
   }
 
