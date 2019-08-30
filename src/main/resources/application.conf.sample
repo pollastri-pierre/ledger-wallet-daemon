@@ -128,7 +128,7 @@ explorer = {
     ethereum_classic = ${?WALLET_ETC_WS_ENDPOINT}
     ethereum_ropsten = "ws://notification.explorers.dev.aws.ledger.fr:9000/ws/{}"
     ethereum_ropsten = ${?WALLET_ETH_ROPSTEN_WS_ENDPOINT}
-    ripple = "ws://notification.explorers.dev.aws.ledger.fr:9000/ws/{}"
+    ripple = "wss://s2.ripple.com:443"
     ripple = ${?WALLET_XRP_WS_ENDPOINT}
   }
 }
