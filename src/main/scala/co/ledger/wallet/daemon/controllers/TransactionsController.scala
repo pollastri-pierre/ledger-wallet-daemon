@@ -143,16 +143,18 @@ object TransactionsController {
 
   case class XRPSendTo(amount: BigInt, address: String)
 
-  case class CreateXRPTransactionRequest(send_to: List[(String, String)], // Send funds to the given address.
+  case class XRPSendToRequest(amount: String, address: String)
+
+  case class CreateXRPTransactionRequest(send_to: List[XRPSendToRequest], // Send funds to the given address.
                                          wipe_to: Option[String],         // Send all available funds to the given address.
-                                         fees: String,                    // Fees (in drop) the originator is willing to pay
+                                         fees: Option[String],            // Fees (in drop) the originator is willing to pay
                                          memos: List[RippleLikeMemo],     // Memos to add for this transaction
                                          destination_tag: Option[Long]    // An arbitrary unsigned 32-bit integer that identifies a reason for payment or a non-Ripple account
                                         ) extends CreateTransactionRequest {
-    def sendToValue: List[XRPSendTo] = send_to.map { case (amount, address) => XRPSendTo(BigInt(amount), address) }
-    def feesValue: BigInt = BigInt(fees)
+    def sendToValue: List[XRPSendTo] = send_to.map { r => XRPSendTo(BigInt(r.amount), r.address) }
+    def feesValue: Option[BigInt] = fees.map(BigInt(_))
 
-    override def transactionInfo: TransactionInfo = XRPTransactionInfo(sendToValue, wipe_to, feesValue, memos, destination_tag)
+    override def transactionInfo: TransactionInfo = XRPTransactionInfo(sendToValue, wipe_to, feesValue: Option[BigInt], memos, destination_tag)
   }
 
   trait TransactionInfo
@@ -163,5 +165,5 @@ object TransactionsController {
 
   case class ETHTransactionInfo(recipient: String, amount: BigInt, gasLimit: Option[BigInt], gasPrice: Option[BigInt], contract: Option[String]) extends TransactionInfo
 
-  case class XRPTransactionInfo(sendTo: List[XRPSendTo], wipeTo: Option[String], fees: BigInt, memos: List[RippleLikeMemo], destinationTag: Option[Long]) extends TransactionInfo
+  case class XRPTransactionInfo(sendTo: List[XRPSendTo], wipeTo: Option[String], fees: Option[BigInt], memos: List[RippleLikeMemo], destinationTag: Option[Long]) extends TransactionInfo
 }

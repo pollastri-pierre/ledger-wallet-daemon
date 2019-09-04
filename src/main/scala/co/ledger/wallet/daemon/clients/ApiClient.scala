@@ -12,6 +12,7 @@ import com.twitter.inject.Logging
 import javax.inject.Singleton
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.parsing.json.JSON
 import scala.util.Try
 
 // TODO: Map response from service to be more readable
@@ -28,6 +29,34 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
       mapper.parse[FeeInfo](response)
     }.asScala()
   }
+
+  def getFeesRipple: Future[BigInt] = {
+    val (host, service) = services.getOrElse("ripple", services("default"))
+    val request = Request(Method.Post, "/").host(host)
+    val body = "{\"method\":\"server_state\",\"params\":[{}]}"
+
+    request.setContentString(body)
+    request.setContentType("application/json")
+
+    service(request).map { response =>
+      JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
+        case map: Map[String, Any] =>
+          val rippleResult = map("result").asInstanceOf[Map[String, Any]]
+          val rippleState = rippleResult("state").asInstanceOf[Map[String, Any]]
+          val rippleValidatedLedger = rippleState("validated_ledger").asInstanceOf[Map[String, Any]]
+          val baseFee = rippleValidatedLedger("base_fee").asInstanceOf[Double]
+          val loadFactor = rippleState("load_factor").asInstanceOf[Double]
+          val loadBase = rippleState("load_base").asInstanceOf[Double]
+
+          info(s"Query rippled server_state: baseFee=${baseFee} loadFactor:${loadFactor} loadBase=${loadBase}")
+          BigInt(((baseFee * loadFactor) / loadBase).toInt)
+        case _ =>
+          info(s"Failed to query server_state method of ripple daemon: " +
+            s"uri=${host} request=${request.contentString} response=${response.contentString}")
+          defaultXRPFees
+      }
+    }
+  }.asScala()
 
   def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
@@ -73,7 +102,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     DaemonConfiguration.explorer.api.paths
       .map { case (currency, path) =>
         val p = path.filterPrefix
-        currency -> (p.host, {
+        currency -> (s"${p.host}:${p.port}", {
           DaemonConfiguration.proxy match {
             case Some(proxy) => client.withTransport.httpProxyTo(s"${p.host}:${p.port}").newService(s"${proxy.host}:${proxy.port}")
             case None => client.newService(s"${p.host}:${p.port}")
@@ -122,6 +151,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     )
   }
   private val defaultGasLimit = BigInt(200000)
+  private val defaultXRPFees = BigInt(10)
 }
 
 object ApiClient {
