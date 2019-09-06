@@ -128,10 +128,11 @@ object Wallet extends Logging {
     }.recoverWith {
       case e: co.ledger.core.implicits.InvalidArgumentException =>
         Future.failed(CoreBadRequestException(e.getMessage, e))
-      case _: co.ledger.core.implicits.AccountAlreadyExistsException =>
+      case e: co.ledger.core.implicits.AccountAlreadyExistsException =>
         for {
           _ <- Future(warn(LogMsgMaker.newInstance("Account already exist")
-            .append("index", accountIndex).append("wallet_name", w.getName).toString()))
+            .append("index", accountIndex).append("wallet_name", w.getName)
+            .append("coreError", s"${'"'}${e.getMessage}${'"'}").toString()))
           a <- w.getAccount(accountIndex)
         } yield a
     }.map { coreA =>

@@ -192,7 +192,9 @@ object Account extends Logging {
     c.parseUnsignedXRPTransaction(rawTx) match {
       case Right(tx) =>
         tx.setDERSignature(signature)
+        debug(s"transaction after sign '${HexUtils.valueOf(tx.serialize())}'")
         a.asRippleLikeAccount.broadcastTransaction(tx)
+
       case Left(m) => Future.failed(new UnsupportedOperationException(s"Account type not supported, can't broadcast XRP transaction: $m"))
     }
   }
