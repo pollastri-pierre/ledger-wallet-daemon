@@ -94,6 +94,7 @@ lazy val versions = new {
   val sqlite     = "3.7.15-M1"
   val tyrus      = "1.13.1"
   val websocket  = "1.1"
+  val web3j      = "4.5.1"
 }
 // scalastyle:on
 
@@ -118,6 +119,8 @@ lazy val root = (project in file("."))
       "org.xerial"                   %  "sqlite-jdbc"            % versions.sqlite,
       "org.glassfish.tyrus.bundles"  % "tyrus-standalone-client" % versions.tyrus,
       "javax.websocket"              % "javax.websocket-api"     % versions.websocket % "provided",
+      "org.web3j"                     % "abi"                    % versions.web3j,
+      "org.web3j"                     % "core"                   % versions.web3j,
 
       // Tests dependencies
       "org.specs2"                   %% "specs2-mock"            % versions.specs2     % "it",

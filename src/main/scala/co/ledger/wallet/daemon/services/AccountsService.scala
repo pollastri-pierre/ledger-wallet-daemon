@@ -23,6 +23,8 @@ import co.ledger.wallet.daemon.utils.Utils._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import com.twitter.finagle.http.{Method, Request}
 import javax.inject.{Inject, Singleton}
+import org.web3j.abi.{FunctionEncoder, TypeReference}
+import org.web3j.abi.datatypes.{Address, Bool, DynamicBytes, Function, Type}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -63,11 +65,23 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
   }
 
   def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
-    val fallbackTimeout = DaemonConfiguration.explorer.api.fallbackTimeout.seconds
+
+    def encodeBalanceFunction(address: String): Try[String] = {
+      val function = new Function(
+        "balanceOf",
+        List[Type[_]](new Address(address)).asJava, // TODO: Check address is correctly formated
+        List[TypeReference[_ <: Type[_]]](new TypeReference[DynamicBytes]() {}).asJava // TODO: Check the return type is correct
+      )
+      Try(FunctionEncoder.encode(function))
+    }
+
+    val fallbackTimeout = DaemonConfiguration.explorer.api.fallbackTimeout.milliseconds
+
     val balance = daemonCache.withAccount(accountInfo)(a => contract match {
       case Some(c) => a.erc20Balance(c)
       case None => a.balance
     })
+
     Await.ready(balance, fallbackTimeout).recoverWith {
       case _ =>
         info("Using fallback provider for balance")
@@ -75,10 +89,18 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
           wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
           (host, client) <- OptionT.fromOption[Future](ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
+          body <- OptionT.liftF(Future.fromTry(contract match {
+            case Some(contractAddress) =>
+              encodeBalanceFunction(address).map { data =>
+                s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": $data],"id":1}"""
+              }
+            case None =>
+              Try {
+                s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
+              }
+          }))
           response <- {
             val request = Request(Method.Post, "/").host(host)
-            val body = s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
-
             request.setContentString(body)
             request.setContentType("application/json")
 
