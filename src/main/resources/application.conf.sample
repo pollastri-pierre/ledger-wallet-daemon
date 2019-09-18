@@ -104,7 +104,7 @@ explorer = {
         host = ${?WALLET_ETH_ROPSTEN_EXPLORER_ENDPOINT}
         port = 80
         port = ${?WALLET_ETH_ROPSTEN_EXPLORER_PORT}
-
+        fallback = "ropsten.infura.io/v3/c0c3514370b2454d9e58a001876167af"
       }
       {
         currency = ripple
