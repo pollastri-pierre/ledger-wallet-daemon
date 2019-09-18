@@ -11,7 +11,7 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import co.ledger.core
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
-import co.ledger.wallet.daemon.clients.{ApiClient, ClientFactory}
+import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.models.Account._
@@ -74,7 +74,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
         val result = for {
           address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
           wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
-          (host, client) <- OptionT.fromOption(ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
+          (host, client) <- OptionT.fromOption[Future](ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
           response <- {
             val request = Request(Method.Post, "/").host(host)
             val body = s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
@@ -91,7 +91,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
             }
           }))
         } yield result
-        result.getOrElse(Future.failed(new Exception("Unable to fetch from fallback provider")))
+        result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
     }
   }
 
