@@ -82,20 +82,22 @@ object DaemonConfiguration {
     val explorer = config.getConfig("explorer")
     val api = explorer.getConfig("api")
     val connectionPoolSize = api.getInt("connection_pool_size")
+    val fallbackTimeout = api.getInt("fallback_timeout")
     val paths = api.getConfigList("paths").asScala.toList.map { path =>
       val currency = path.getString("currency")
       val host = path.getString("host")
       val port = path.getInt("port")
-      currency -> PathConfig(host, port)
+      val fallback = Try(path.getString("fallback")).toOption
+      currency -> PathConfig(host, port, fallback)
     }.toMap
     val ws = explorer.getObject("ws").unwrapped().asScala.toMap.mapValues(_.toString)
-    ExplorerConfig(ApiConfig(connectionPoolSize, paths), ws)
+    ExplorerConfig(ApiConfig(connectionPoolSize, fallbackTimeout, paths), ws)
   }
 
-  case class ApiConfig(connectionPoolSize: Int, paths: Map[String, PathConfig])
-  case class PathConfig(host: String, port: Int) {
+  case class ApiConfig(connectionPoolSize: Int, fallbackTimeout: Int, paths: Map[String, PathConfig])
+  case class PathConfig(host: String, port: Int, fallback: Option[String]) {
     def filterPrefix: PathConfig = {
-      PathConfig(host.replaceFirst(".+?://", ""), port)
+      PathConfig(host.replaceFirst(".+?://", ""), port, fallback.map(_.replaceFirst(".+?://", "")))
     }
   }
   case class ExplorerConfig(api: ApiConfig, ws: Map[String, String])

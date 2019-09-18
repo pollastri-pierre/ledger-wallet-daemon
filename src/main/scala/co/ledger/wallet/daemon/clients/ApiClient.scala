@@ -68,9 +68,10 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 
   private val mapper: FinatraObjectMapper = FinatraObjectMapper.create()
   private val client = Http.client.withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
+
   private val services: Map[String, (String, Service[Request, Response])] =
     DaemonConfiguration.explorer.api.paths
-      .map { case(currency, path) =>
+      .map { case (currency, path) =>
         val p = path.filterPrefix
         currency -> (p.host, {
           DaemonConfiguration.proxy match {
@@ -79,6 +80,18 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
           }
         })
       }
+
+  def fallbackClient(currency: String): Option[(String, Service[Request, Response])] = {
+    DaemonConfiguration.explorer.api.paths.get(currency)
+      .flatMap(_.filterPrefix.fallback)
+      .map { fallbackHost =>
+        val c = DaemonConfiguration.proxy match {
+          case Some(proxy) => client.withTransport.httpProxyTo(fallbackHost).newService(s"${proxy.host}:${proxy.port}")
+          case None => client.newService(fallbackHost)
+        }
+        (fallbackHost, c)
+      }
+  }
 
   private val paths: Map[String, String] = {
     Map(

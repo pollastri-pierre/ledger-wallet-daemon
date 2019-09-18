@@ -76,6 +76,7 @@ update_wallet_config = ${?WALLET_UPDATE_WALLET_CONFIG}
 explorer = {
   api = {
     connection_pool_size = 50
+    fallback_timeout = 3
     paths = [
       {
         currency = default
@@ -88,6 +89,7 @@ explorer = {
         host = ${?WALLET_ETH_EXPLORER_ENDPOINT}
         port = 80
         port = ${?WALLET_ETH_EXPLORER_PORT}
+        fallback = "https://mainnet.infura.io/v3/c0c3514370b2454d9e58a001876167af"
       }
       {
         currency = ethereum_classic
@@ -102,6 +104,7 @@ explorer = {
         host = ${?WALLET_ETH_ROPSTEN_EXPLORER_ENDPOINT}
         port = 80
         port = ${?WALLET_ETH_ROPSTEN_EXPLORER_PORT}
+
       }
       {
         currency = ripple
@@ -112,6 +115,7 @@ explorer = {
       }
     ]
   }
+  
   ws = {
     default = "wss://ws.ledgerwallet.com/blockchain/v2/{}/ws"
     default = ${?WALLET_DEFAULT_WS_ENDPOINT}

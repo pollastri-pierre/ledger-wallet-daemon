@@ -1,9 +1,9 @@
 package co.ledger.wallet.daemon.services
 
 import co.ledger.wallet.daemon.utils.Utils.RichBigInt
-
 import java.util.{Date, UUID}
 
+import cats.data.OptionT
 import cats.instances.future._
 import cats.instances.list._
 import cats.instances.option._
@@ -11,17 +11,24 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import co.ledger.core
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.clients.{ApiClient, ClientFactory}
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
+import co.ledger.wallet.daemon.utils.Utils._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
+import com.twitter.finagle.http.{Method, Request}
 import javax.inject.{Inject, Singleton}
-import scala.collection.JavaConverters._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.collection.JavaConverters._
+import scala.concurrent.{Await, ExecutionContext, Future}
+import scala.concurrent.duration._
+import scala.util.Try
+import scala.util.parsing.json.JSON
 
 @Singleton
 class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
@@ -55,11 +62,37 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.getAccount(accountInfo: AccountInfo)
   }
 
-  def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] =
-    daemonCache.withAccount(accountInfo)(a => contract match {
+  def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
+    val fallbackTimeout = DaemonConfiguration.explorer.api.fallbackTimeout.seconds
+    val balance = daemonCache.withAccount(accountInfo)(a => contract match {
       case Some(c) => a.erc20Balance(c)
       case None => a.balance
     })
+    Await.ready(balance, fallbackTimeout).recoverWith {
+      case _ =>
+        val result = for {
+          address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
+          wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
+          (host, client) <- OptionT.fromOption(ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
+          response <- {
+            val request = Request(Method.Post, "/").host(host)
+            val body = s"{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\": [\"$address\", \"latest\"],\"id\":1}"
+
+            request.setContentString(body)
+            request.setContentType("application/json")
+
+            OptionT.liftF(client(request).asScala())
+          }
+          result <- OptionT.liftF(Future.fromTry(Try {
+            JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
+              case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String], 16)
+              case _ => throw new Exception("Failed to parse fallback provider result")
+            }
+          }))
+        } yield result
+        result.getOrElse(Future.failed(new Exception("Unable to fetch from fallback provider")))
+    }
+  }
 
   def getXpub(accountInfo: AccountInfo): Future[String] =
     daemonCache.withAccount(accountInfo) { a => Future.successful(a.getRestoreKey) }
