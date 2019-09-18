@@ -24,7 +24,7 @@ import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import com.twitter.finagle.http.{Method, Request}
 import javax.inject.{Inject, Singleton}
 import org.web3j.abi.{FunctionEncoder, TypeReference}
-import org.web3j.abi.datatypes.{Address, Bool, DynamicBytes, Function, Type}
+import org.web3j.abi.datatypes.{Address, DynamicBytes, Function, Type}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
