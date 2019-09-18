@@ -70,13 +70,14 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     })
     Await.ready(balance, fallbackTimeout).recoverWith {
       case _ =>
+        info("Using fallback provider for balance")
         val result = for {
           address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
           wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
           (host, client) <- OptionT.fromOption(ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
           response <- {
             val request = Request(Method.Post, "/").host(host)
-            val body = s"{\"jsonrpc\":\"2.0\",\"method\":\"eth_getBalance\",\"params\": [\"$address\", \"latest\"],\"id\":1}"
+            val body = s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
 
             request.setContentString(body)
             request.setContentType("application/json")
