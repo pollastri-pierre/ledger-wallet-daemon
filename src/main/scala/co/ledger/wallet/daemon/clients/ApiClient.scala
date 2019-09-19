@@ -68,9 +68,10 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 
   private val mapper: FinatraObjectMapper = FinatraObjectMapper.create()
   private val client = Http.client.withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
+
   private val services: Map[String, (String, Service[Request, Response])] =
     DaemonConfiguration.explorer.api.paths
-      .map { case(currency, path) =>
+      .map { case (currency, path) =>
         val p = path.filterPrefix
         currency -> (p.host, {
           DaemonConfiguration.proxy match {
@@ -79,6 +80,23 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
           }
         })
       }
+
+  def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
+    for {
+      config <- DaemonConfiguration.explorer.api.paths.get(currency)
+      fallback <- config.filterPrefix.fallback
+      result <- fallback.split("/", 2).toList match {
+        case host :: query :: _ =>
+          val c = DaemonConfiguration.proxy match {
+            case Some(proxy) => client.withTransport.httpProxyTo(s"${host}:443").withTls(host).newService(s"${proxy.host}:${proxy.port}")
+            case None => client.withTls(host).newService(s"${host}:443")
+          }
+          Some(FallbackParams(s"${host}:443", "/" + query), c)
+        case _ =>
+          None
+      }
+    } yield result
+  }
 
   private val paths: Map[String, String] = {
     Map(
@@ -107,6 +125,8 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 }
 
 object ApiClient {
+  case class FallbackParams(host: String, query: String)
+
   case class FeeInfo(
                     @JsonProperty("1") fast: BigInt,
                     @JsonProperty("3") normal: BigInt,
