@@ -93,7 +93,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
             case Some(proxy) => client.withTransport.httpProxyTo(host).newService(s"${proxy.host}:${proxy.port}")
             case None => client.newService(host)
           }
-        Some(FallbackParams(host, query), c)
+        Some(FallbackParams(host, "/" + query), c)
       case _ =>
         None
       }
