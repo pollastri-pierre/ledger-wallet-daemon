@@ -94,7 +94,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           body <- OptionT.liftF(Future.fromTry(contract match {
             case Some(contractAddress) =>
               encodeBalanceFunction(address).map { data =>
-                s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": $data}, "latest"],"id":1}"""
+                s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
               }
             case None =>
               Try {
@@ -104,15 +104,12 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           response <- {
             val request = Request(Method.Post, fallback.query).host(fallback.host)
 
-            info(s"BANANA: $body request=${request.host}")
-
             request.setContentString(body)
             request.setContentType("application/json")
 
             OptionT.liftF(client(request).asScala())
           }
           result <- OptionT.liftF(Future.fromTry(Try {
-            info(s"POTATO: ${response.contentString}")
             JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
               case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
               case _ => throw new Exception("Failed to parse fallback provider result")

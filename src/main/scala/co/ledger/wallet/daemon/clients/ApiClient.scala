@@ -84,17 +84,6 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   case class FallbackParams(host: String, query: String)
 
   def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
-//    for {
-//      config <- DaemonConfiguration.explorer.api.paths.get(currency)
-//      fallback <- config.fallback
-//    } yield {
-//      val c = DaemonConfiguration.proxy match {
-//        case Some(proxy) => client.withTransport.httpProxyTo(fallback).newService(s"${proxy.host}:${proxy.port}")
-//        case None => client.newService(fallback)
-//      }
-//      (FallbackParams(fallback, "/"), c)
-//    }
-
     for {
       config <- DaemonConfiguration.explorer.api.paths.get(currency)
       fallback <- config.filterPrefix.fallback
