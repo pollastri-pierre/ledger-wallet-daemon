@@ -67,6 +67,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
   def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
 
     def encodeBalanceFunction(address: String): Try[String] = {
+      info(s"Try to encode balance function with address: $address")
       val function = new Function(
         "balanceOf",
         List[Type[_]](new Address(address)).asJava, // TODO: Check address is correctly formated
