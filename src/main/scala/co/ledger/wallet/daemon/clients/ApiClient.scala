@@ -81,8 +81,6 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         })
       }
 
-  case class FallbackParams(host: String, query: String)
-
   def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
     for {
       config <- DaemonConfiguration.explorer.api.paths.get(currency)
@@ -127,6 +125,8 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 }
 
 object ApiClient {
+  case class FallbackParams(host: String, query: String)
+
   case class FeeInfo(
                     @JsonProperty("1") fast: BigInt,
                     @JsonProperty("3") normal: BigInt,
