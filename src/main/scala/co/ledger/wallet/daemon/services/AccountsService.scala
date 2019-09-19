@@ -29,7 +29,7 @@ import org.web3j.abi.datatypes.{Address, Function, Type, Uint}
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import scala.util.parsing.json.JSON
 
 @Singleton
@@ -83,9 +83,10 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       case None => a.balance
     })
 
-    Await.ready(balance, fallbackTimeout).recoverWith {
-      case _ =>
-        info("Using fallback provider for balance")
+    Try(Await.ready(balance, fallbackTimeout)) match {
+      case Failure(e) =>
+        warn(s"Failed to get balance from libcore: $e")
+        info("Using fallback provider")
         val result = for {
           address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
           wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
@@ -115,6 +116,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           }))
         } yield result
         result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
+      case Success(value) => value
     }
   }
 
