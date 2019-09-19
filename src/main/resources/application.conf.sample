@@ -76,7 +76,7 @@ update_wallet_config = ${?WALLET_UPDATE_WALLET_CONFIG}
 explorer = {
   api = {
     connection_pool_size = 50
-    fallback_timeout = 3000 # ms
+    fallback_timeout = 1000 # ms
     paths = [
       {
         currency = default
