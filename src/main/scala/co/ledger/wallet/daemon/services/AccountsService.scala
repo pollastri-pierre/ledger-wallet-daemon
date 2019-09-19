@@ -76,49 +76,56 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       Try(FunctionEncoder.encode(function))
     }
 
-    val fallbackTimeout = DaemonConfiguration.explorer.api.fallbackTimeout.milliseconds
-
     val balance = daemonCache.withAccount(accountInfo)(a => contract match {
       case Some(c) => a.erc20Balance(c)
       case None => a.balance
     })
 
-    Try(Await.ready(balance, fallbackTimeout)) match {
-      case Failure(e) =>
-        warn(s"Failed to get balance from libcore: $e")
-        info("Using fallback provider")
-        val result = for {
-          address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
-          wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
-          (fallback, client) <- OptionT.fromOption[Future](ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
-          body <- OptionT.liftF(Future.fromTry(contract match {
-            case Some(contractAddress) =>
-              encodeBalanceFunction(address).map { data =>
-                s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
-              }
-            case None =>
-              Try {
-                s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
-              }
-          }))
-          response <- {
-            val request = Request(Method.Post, fallback.query).host(fallback.host)
+    daemonCache.withWallet(accountInfo.walletInfo)(Future.successful)
+      .map { wallet => ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName) }
+      .flatMap { fallbackConfig =>
 
-            request.setContentString(body)
-            request.setContentType("application/json")
+        val fallbackTimeout = fallbackConfig match {
+          case Some(_) => DaemonConfiguration.explorer.api.fallbackTimeout.milliseconds
+          case None => scala.concurrent.duration.Duration.Inf
+        }
 
-            OptionT.liftF(client(request).asScala())
-          }
-          result <- OptionT.liftF(Future.fromTry(Try {
-            JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
-              case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
-              case _ => throw new Exception("Failed to parse fallback provider result")
-            }
-          }))
-        } yield result
-        result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
-      case Success(value) => value
-    }
+        Try(Await.ready(balance, fallbackTimeout)) match {
+          case Failure(e) =>
+            warn(s"Failed to get balance from libcore: $e")
+            info("Using fallback provider")
+            val result = for {
+              (fallback, client) <- OptionT.fromOption[Future](fallbackConfig)
+              address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
+              body <- OptionT.liftF(Future.fromTry(contract match {
+                case Some(contractAddress) =>
+                  encodeBalanceFunction(address).map { data =>
+                    s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
+                  }
+                case None =>
+                  Try {
+                    s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
+                  }
+              }))
+              response <- {
+                val request = Request(Method.Post, fallback.query).host(fallback.host)
+
+                request.setContentString(body)
+                request.setContentType("application/json")
+
+                OptionT.liftF(client(request).asScala())
+              }
+              result <- OptionT.liftF(Future.fromTry(Try {
+                JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
+                  case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
+                  case _ => throw new Exception("Failed to parse fallback provider result")
+                }
+              }))
+            } yield result
+            result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
+          case Success(value) => value
+        }
+      }
   }
 
   def getXpub(accountInfo: AccountInfo): Future[String] =
