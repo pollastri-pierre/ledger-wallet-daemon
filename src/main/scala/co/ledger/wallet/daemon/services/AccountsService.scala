@@ -91,9 +91,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
                   s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
                 }
               case None =>
-                Try {
-                  s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}"""
-                }
+                Success(s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}""")
             }))
             response <- {
               val request = Request(Method.Post, fallback.query).host(fallback.host)
