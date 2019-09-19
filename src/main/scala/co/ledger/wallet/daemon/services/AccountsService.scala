@@ -104,14 +104,17 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           response <- {
             val request = Request(Method.Post, fallback.query).host(fallback.host)
 
+            info(s"BANANA: ${body} request=${request.host}")
+
             request.setContentString(body)
             request.setContentType("application/json")
 
             OptionT.liftF(client(request).asScala())
           }
           result <- OptionT.liftF(Future.fromTry(Try {
+            info(s"POTATO: ${response.contentString}")
             JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
-              case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String], 16)
+              case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
               case _ => throw new Exception("Failed to parse fallback provider result")
             }
           }))
