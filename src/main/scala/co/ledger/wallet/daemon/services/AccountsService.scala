@@ -70,7 +70,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       info(s"Try to encode balance function with address: $address")
       val function = new Function(
         "balanceOf",
-        List[Type[_]](new Address(address)).asJava, // TODO: Check address is correctly formated
+        List[Type[_]](new Address(address.replaceFirst("0x", ""))).asJava,
         List[TypeReference[_ <: Type[_]]](new TypeReference[DynamicBytes]() {}).asJava // TODO: Check the return type is correct
       )
       Try(FunctionEncoder.encode(function))
