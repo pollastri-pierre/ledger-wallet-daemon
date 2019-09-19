@@ -24,7 +24,7 @@ import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import com.twitter.finagle.http.{Method, Request}
 import javax.inject.{Inject, Singleton}
 import org.web3j.abi.{FunctionEncoder, TypeReference}
-import org.web3j.abi.datatypes.{Address, DynamicBytes, Function, Type}
+import org.web3j.abi.datatypes.{Address, Function, Type, Uint}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
@@ -71,7 +71,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       val function = new Function(
         "balanceOf",
         List[Type[_]](new Address(address.replaceFirst("0x", ""))).asJava,
-        List[TypeReference[_ <: Type[_]]](new TypeReference[DynamicBytes]() {}).asJava // TODO: Check the return type is correct
+        List[TypeReference[_ <: Type[_]]](new TypeReference[Uint]() {}).asJava
       )
       Try(FunctionEncoder.encode(function))
     }
