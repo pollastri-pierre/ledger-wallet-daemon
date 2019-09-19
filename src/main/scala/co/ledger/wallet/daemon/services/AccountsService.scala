@@ -90,7 +90,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
         val result = for {
           address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
           wallet <- OptionT.liftF(daemonCache.withWallet(accountInfo.walletInfo)(Future.successful))
-          (host, client) <- OptionT.fromOption[Future](ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
+          (fallback, client) <- OptionT.fromOption[Future](ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName))
           body <- OptionT.liftF(Future.fromTry(contract match {
             case Some(contractAddress) =>
               encodeBalanceFunction(address).map { data =>
@@ -102,7 +102,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
               }
           }))
           response <- {
-            val request = Request(Method.Post, "/").host(host)
+            val request = Request(Method.Post, fallback.query).host(fallback.host)
+
             request.setContentString(body)
             request.setContentType("application/json")
 

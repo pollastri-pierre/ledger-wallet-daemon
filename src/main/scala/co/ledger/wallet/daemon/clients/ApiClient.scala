@@ -81,16 +81,23 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         })
       }
 
-  def fallbackClient(currency: String): Option[(String, Service[Request, Response])] = {
-    DaemonConfiguration.explorer.api.paths.get(currency)
-      .flatMap(_.filterPrefix.fallback)
-      .map { fallbackHost =>
-        val c = DaemonConfiguration.proxy match {
-          case Some(proxy) => client.withTransport.httpProxyTo(fallbackHost).newService(s"${proxy.host}:${proxy.port}")
-          case None => client.newService(fallbackHost)
-        }
-        (fallbackHost, c)
+  case class FallbackParams(host: String, query: String)
+
+  def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
+    for {
+      config <- DaemonConfiguration.explorer.api.paths.get(currency)
+      fallback <- config.filterPrefix.fallback
+      result <- fallback.split("/", 2).toList match {
+        case host :: query :: _ =>
+          val c = DaemonConfiguration.proxy match {
+            case Some(proxy) => client.withTransport.httpProxyTo(host).newService(s"${proxy.host}:${proxy.port}")
+            case None => client.newService(host)
+          }
+        Some(FallbackParams(host, query), c)
+      case _ =>
+        None
       }
+    } yield result
   }
 
   private val paths: Map[String, String] = {
