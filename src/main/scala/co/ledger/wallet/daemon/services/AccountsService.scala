@@ -31,7 +31,7 @@ import org.web3j.abi.datatypes.{Address, Function, Type, Uint}
 import scala.collection.JavaConverters._
 import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 import scala.util.parsing.json.JSON
 
 @Singleton
@@ -79,37 +79,35 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     }
 
     def runWithFallback(cb: Future[BigInt], fallback: FallbackParams, client: Service[Request, Response], timeout: Duration): Future[BigInt] = {
-      Try(Await.ready(cb, timeout)) match {
-        case Failure(e) =>
-          warn(s"Failed to get balance from libcore: $e")
-          info("Using fallback provider")
-          val result = for {
-            address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
-            body <- OptionT.liftF(Future.fromTry(contract match {
-              case Some(contractAddress) =>
-                encodeBalanceFunction(address).map { data =>
-                  s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
-                }
-              case None =>
-                Success(s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}""")
-            }))
-            response <- {
-              val request = Request(Method.Post, fallback.query).host(fallback.host)
-
-              request.setContentString(body)
-              request.setContentType("application/json")
-
-              OptionT.liftF(client(request).asScala())
-            }
-            result <- OptionT.liftF(Future.fromTry(Try {
-              JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
-                case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
-                case _ => throw new Exception("Failed to parse fallback provider result")
+      Future(Await.result(cb, timeout)).recoverWith { case t =>
+        warn(s"Failed to get balance from libcore: $t")
+        info("Using fallback provider")
+        val result = for {
+          address <- OptionT(accountFreshAddresses(accountInfo).map(_.headOption.map(_.address)))
+          body <- OptionT.liftF(Future.fromTry(contract match {
+            case Some(contractAddress) =>
+              encodeBalanceFunction(address).map { data =>
+                s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
               }
-            }))
-          } yield result
-          result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
-        case Success(value) => value
+            case None =>
+              Success(s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}""")
+          }))
+          response <- {
+            val request = Request(Method.Post, fallback.query).host(fallback.host)
+
+            request.setContentString(body)
+            request.setContentType("application/json")
+
+            OptionT.liftF(client(request).asScala())
+          }
+          result <- OptionT.liftF(Future.fromTry(Try {
+            JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
+              case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
+              case _ => throw new Exception("Failed to parse fallback provider result")
+            }
+          }))
+        } yield result
+        result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
       }
     }
 
