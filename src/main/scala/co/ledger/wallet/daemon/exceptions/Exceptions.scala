@@ -76,7 +76,7 @@ case class SignatureSizeUnmatchException(txSize: Int, signatureSize: Int) extend
   val msg = "Signatures and transaction inputs size not matching"
 } with Exception(msg) with DaemonException
 
-trait DaemonException {
+trait DaemonException extends Throwable{
   def code: Int
 
   def msg: String
