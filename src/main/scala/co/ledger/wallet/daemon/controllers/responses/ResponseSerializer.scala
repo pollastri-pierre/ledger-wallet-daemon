@@ -10,7 +10,7 @@ object ResponseSerializer extends Logging {
     error(ErrorCode.Internal_Error, caught)
     response.internalServerError
       .body(ErrorResponseBody(ErrorCode.Internal_Error, Map(
-        "response"-> s"Internal server error occurred while processing the request. ${caught.getMessage}",
+        "response"->s"Internal server error occurred while processing the request. ${caught.getMessage}"
       )))
   }
 
