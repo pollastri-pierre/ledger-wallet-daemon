@@ -49,8 +49,8 @@ object RippleTransactionView {
       tx.getSender.toBase58,
       tx.getValue.toString,
       tx.getDate,
-      tx.getSequence.toString,
-      tx.getLedgerSequence.toString,
+      tx.getSequence.toString(10),
+      tx.getLedgerSequence.toString(10),
       HexUtils.valueOf(tx.getSigningPubKey),
       tx.getMemos.asScala.toList,
       tx.getDestinationTag
@@ -80,8 +80,8 @@ object UnsignedRippleTransactionView {
       tx.getSender.toBase58,
       tx.getValue.toString,
       tx.getDate,
-      tx.getSequence.toString,
-      tx.getLedgerSequence.toString,
+      tx.getSequence.toString(10),
+      tx.getLedgerSequence.toString(10),
       tx.getMemos.asScala.toList,
       tx.getDestinationTag,
       HexUtils.valueOf(tx.serialize)
