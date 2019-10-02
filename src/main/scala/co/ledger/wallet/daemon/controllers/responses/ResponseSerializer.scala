@@ -9,7 +9,9 @@ object ResponseSerializer extends Logging {
   def serializeInternalError(response: ResponseBuilder, caught: Throwable): Response = {
     error(ErrorCode.Internal_Error, caught)
     response.internalServerError
-      .body(ErrorResponseBody(ErrorCode.Internal_Error, Map("response"->"Problem occurred when processing the request, check with developers")))
+      .body(ErrorResponseBody(ErrorCode.Internal_Error, Map(
+        "response"->s"Internal server error occurred while processing the request. ${caught.getMessage}"
+      )))
   }
 
   def serializeBadRequest(msg: Map[String, Any], response: ResponseBuilder): Response = {

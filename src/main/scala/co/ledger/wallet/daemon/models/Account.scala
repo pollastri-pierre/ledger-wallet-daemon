@@ -192,7 +192,9 @@ object Account extends Logging {
     c.parseUnsignedXRPTransaction(rawTx) match {
       case Right(tx) =>
         tx.setDERSignature(signature)
+        debug(s"transaction after sign '${HexUtils.valueOf(tx.serialize())}'")
         a.asRippleLikeAccount.broadcastTransaction(tx)
+
       case Left(m) => Future.failed(new UnsupportedOperationException(s"Account type not supported, can't broadcast XRP transaction: $m"))
     }
   }
@@ -266,13 +268,17 @@ object Account extends Logging {
   }
 
   private def createXRPTransaction(ti: XRPTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
-    val builder = a.asRippleLikeAccount().buildTransaction
+    val builder = a.asRippleLikeAccount().buildTransaction()
     ti.sendTo.foreach(sendTo => builder.sendToAddress(c.convertAmount(sendTo.amount), sendTo.address))
     ti.wipeTo.foreach(builder.wipeToAddress)
     ti.memos.foreach(builder.addMemo)
     ti.destinationTag.foreach(builder.setDestinationTag)
-    builder.setFees(c.convertAmount(ti.fees))
-    builder.build().map(UnsignedRippleTransactionView.apply)
+
+    for {
+      fees <- ti.fees.fold(ClientFactory.apiClient.getFeesRipple)(Future.successful)
+      _ = builder.setFees(c.convertAmount(fees))
+      view <- builder.build().map(UnsignedRippleTransactionView.apply)
+    } yield view
   }
 
   def createTransaction(transactionInfo: TransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {

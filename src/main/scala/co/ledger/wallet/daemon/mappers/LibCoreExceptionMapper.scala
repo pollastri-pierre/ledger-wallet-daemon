@@ -1,18 +1,21 @@
 package co.ledger.wallet.daemon.mappers
 
-import com.twitter.finatra.http.exceptions.ExceptionMapper
-import com.twitter.finatra.http.response.ResponseBuilder
-import co.ledger.core.implicits.NotEnoughFundsException
+import co.ledger.core.implicits.{LedgerCoreWrappedException, NotEnoughFundsException}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import com.twitter.finagle.http.{Request, Response}
+import com.twitter.finatra.http.exceptions.ExceptionMapper
+import com.twitter.finatra.http.response.ResponseBuilder
 import javax.inject.{Inject, Singleton}
 
 @Singleton
 class LibCoreExceptionMapper @Inject()(response: ResponseBuilder)
-  extends ExceptionMapper[NotEnoughFundsException] {
-  override def toResponse(request: Request, throwable: NotEnoughFundsException): Response = {
-    ResponseSerializer.serializeBadRequest(
-      Map("response" -> "Not enough funds"), response)
+  extends ExceptionMapper[LedgerCoreWrappedException] {
+  override def toResponse(request: Request, throwable: LedgerCoreWrappedException): Response = throwable match {
+    case _: NotEnoughFundsException =>
+      ResponseSerializer.serializeBadRequest(
+        Map("response" -> "Not enough funds"), response)
+    case e =>
+      ResponseSerializer.serializeInternalError(response, e)
   }
 }
 

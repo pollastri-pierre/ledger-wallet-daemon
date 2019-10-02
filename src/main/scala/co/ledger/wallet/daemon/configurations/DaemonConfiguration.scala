@@ -16,6 +16,17 @@ object DaemonConfiguration {
   private val DEFAULT_SYNC_INTERVAL: Int = 24 // 24 hours
   private val DEFAULT_SYNC_INITIAL_DELAY: Int = 300 // 5 minutes
 
+  /*
+   * We set the value of RIPPLE_LAST_LEDGER_SEQUENCE_OFFSET to be large enough
+   * for use in Vault, but not infinity.
+   *
+   * The value we use if equal to the number of valid XRP Sequences produced in
+   * one year, assuming a Sequence finality time of 3 seconds.
+   *
+   * See https://ledgerhq.atlassian.net/browse/LLC-346 for more information.
+   */
+  private val RIPPLE_LAST_LEDGER_SEQUENCE_OFFSET: Int = 10512000
+
   val proxy: Option[Proxy] = {
     if (config.getBoolean("proxy.enabled")) {
       Some(Proxy(config.getString("proxy.host"), config.getInt("proxy.port")))
@@ -92,6 +103,15 @@ object DaemonConfiguration {
     }.toMap
     val ws = explorer.getObject("ws").unwrapped().asScala.toMap.mapValues(_.toString)
     ExplorerConfig(ApiConfig(connectionPoolSize, fallbackTimeout, paths), ws)
+  }
+
+  val rippleLastLedgerSequenceOffset: Int = {
+    if (config.hasPath("ripple_last_ledger_sequence_offset")) {
+      config.getInt("ripple_last_ledger_sequence_offset")
+    }
+    else {
+      RIPPLE_LAST_LEDGER_SEQUENCE_OFFSET
+    }
   }
 
   case class ApiConfig(connectionPoolSize: Int, fallbackTimeout: Int, paths: Map[String, PathConfig])

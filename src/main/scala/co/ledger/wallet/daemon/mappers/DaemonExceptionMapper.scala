@@ -9,12 +9,12 @@ import javax.inject.{Inject, Singleton}
 
 @Singleton
 class DaemonExceptionMapper @Inject()(response: ResponseBuilder)
-  extends ExceptionMapper[Exception with DaemonException] {
+  extends ExceptionMapper[DaemonException] {
 
   private def daemonExceptionInfo(de: DaemonException): Map[String, Any] =
     Map("response" -> de.msg, "error_code" -> de.code)
 
-  override def toResponse(request: Request, throwable: Exception with DaemonException): Response = {
+  override def toResponse(request: Request, throwable: DaemonException): Response = {
     throwable match {
       case anfe: AccountNotFoundException =>
         ResponseSerializer.serializeBadRequest(
