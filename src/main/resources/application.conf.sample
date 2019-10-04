@@ -112,9 +112,9 @@ explorer = {
       {
         currency = ripple
         host = "https://s2.ripple.com"
-        host = ${?WALLET_XRP_ROPSTEN_EXPLORER_ENDPOINT}
+        host = ${?WALLET_XRP_EXPLORER_ENDPOINT}
         port = 51234
-        port = ${?WALLET_XRP_ROPSTEN_EXPLORER_PORT}
+        port = ${?WALLET_XRP_EXPLORER_PORT}
       }
     ]
   }
