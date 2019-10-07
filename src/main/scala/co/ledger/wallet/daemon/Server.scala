@@ -7,9 +7,11 @@ import co.ledger.wallet.daemon.modules.{DaemonCacheModule, DaemonJacksonModule}
 import co.ledger.wallet.daemon.utils.NativeLibLoader
 import com.google.inject.Module
 import com.twitter.finagle.http.{Request, Response}
+import com.twitter.finagle.Http
 import com.twitter.finatra.http.HttpServer
 import com.twitter.finatra.http.filters.{AccessLoggingFilter, CommonFilters, LoggingMDCFilter, TraceIdMDCFilter}
 import com.twitter.finatra.http.routing.HttpRouter
+import com.twitter.util.Duration
 
 object Server extends ServerImpl
 
@@ -38,6 +40,12 @@ class ServerImpl extends HttpServer {
       .exceptionMapper[AuthenticationExceptionMapper]
       .exceptionMapper[DaemonExceptionMapper]
       .exceptionMapper[LibCoreExceptionMapper]
+
+  override protected def configureHttpServer(server: Http.Server): Http.Server = {
+    server
+      .withSession.maxIdleTime(Duration.fromSeconds(10))
+      .withSession.maxLifeTime(Duration.fromSeconds(300))
+  }
 
   override protected def warmup(): Unit = {
     super.warmup()
