@@ -37,7 +37,8 @@ case class EthereumTransactionView(
                                     @JsonProperty("erc20") erc20: Option[EthereumTransactionView.ERC20],
                                     @JsonProperty("gas_price") gasPrice: String,
                                     @JsonProperty("gas_limit") gasLimit: String,
-                                    @JsonProperty("date") date: Date
+                                    @JsonProperty("date") date: Date,
+                                    @JsonProperty("status") status: Int
                                   ) extends TransactionView
 
 object EthereumTransactionView {
@@ -51,7 +52,8 @@ object EthereumTransactionView {
       None,
       tx.getGasPrice.toString,
       tx.getGasLimit.toString,
-      tx.getDate
+      tx.getDate,
+      tx.getStatus()
     )
   }
 
@@ -72,7 +74,8 @@ case class UnsignedEthereumTransactionView(
                                             @JsonProperty("gas_price") gasPrice: String,
                                             @JsonProperty("gas_limit") gasLimit: String,
                                             @JsonProperty("fees") fees: String,
-                                            @JsonProperty("raw_transaction") rawTransaction: String
+                                            @JsonProperty("raw_transaction") rawTransaction: String,
+                                            @JsonProperty("status") status: Int
                                           ) extends TransactionView
 
 object UnsignedEthereumTransactionView {
@@ -84,7 +87,8 @@ object UnsignedEthereumTransactionView {
       tx.getGasPrice.toString,
       tx.getGasLimit.toString,
       (tx.getGasPrice.toBigInt.asScala * tx.getGasLimit.toBigInt.asScala).toString,
-      HexUtils.valueOf(tx.serialize())
+      HexUtils.valueOf(tx.serialize()),
+      tx.getStatus()
     )
   }
 }
