@@ -19,7 +19,7 @@ MACOS_BUILD_DIR=$CURRENT_DIR/../lib-ledger-core-build
 LINUX_BUILD_DIR=$CURRENT_DIR/../lib-ledger-core-build-linux
 JAR_BUILD_DIR=$CURRENT_DIR/../build-jar
 LIBCORE_AWS_URL_BASE="https://s3-eu-west-1.amazonaws.com/ledger-lib-ledger-core"
-LIBCORE_VERSION="3.1.0-rc-6ac356"
+LIBCORE_VERSION="3.1.0-rc-da6037"
 
 function gen_interface()
 {
