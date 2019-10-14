@@ -110,4 +110,4 @@ workflows:
                 - release_candidate
                 - release_candidate_drop2
             tags:
-              only: /v.*/
+              only: /.*/
