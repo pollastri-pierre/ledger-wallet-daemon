@@ -2,7 +2,8 @@ package co.ledger.wallet.daemon.models
 
 import co.ledger.core
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.core.{ConfigurationDefaults, ErrorCode}
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.PoolDto
@@ -11,23 +12,21 @@ import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
+import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.{HexUtils, Utils}
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 import org.bitcoinj.core.Sha256Hash
-import Wallet._
-import co.ledger.core.{ConfigurationDefaults, ErrorCode}
 
 import scala.collection.JavaConverters._
 import scala.collection._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
   private[this] val self = this
 
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   private val _coreExecutionContext = LedgerCoreExecutionContext.newThreadPool()
   private[this] val eventReceivers: mutable.Set[core.EventReceiver] = Utils.newConcurrentSet[core.EventReceiver]
 

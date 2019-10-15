@@ -1,17 +1,16 @@
 package co.ledger.wallet.daemon.services
 
-import javax.inject.{Inject, Singleton}
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
 import co.ledger.wallet.daemon.models.{PoolInfo, WalletPoolView}
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
+import javax.inject.{Inject, Singleton}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 @Singleton
 class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   import PoolsService._
 
   def createPool(poolInfo: PoolInfo, configuration: PoolConfiguration): Future[WalletPoolView] = {

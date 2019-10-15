@@ -1,18 +1,17 @@
 package co.ledger.wallet.daemon.services
 
-import javax.inject.{Inject, Singleton}
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.exceptions.CurrencyNotFoundException
+import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models._
-import Currency._
+import javax.inject.{Inject, Singleton}
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 import scala.util.Try
 
 @Singleton
 class CurrenciesService @Inject()(daemonCache: DaemonCache) extends DaemonService {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   def currency(currencyName: String, poolInfo: PoolInfo): Future[Option[CurrencyView]] = {
     daemonCache.getCurrency(currencyName, poolInfo).map { currency => currency.map(_.currencyView) }

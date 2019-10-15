@@ -1,18 +1,23 @@
 package co.ledger.wallet.daemon.clients
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import java.util.concurrent.Executors
+
 import co.ledger.wallet.daemon.libledger_core.async.ScalaThreadDispatcher
 
 import scala.concurrent.ExecutionContext
 
 
 object ClientFactory {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
-
-  private[this] val apiC: ApiClient = new ApiClient
+  private[this] val apiC: ApiClient = new ApiClient()(
+    ExecutionContext.fromExecutor(Executors.newCachedThreadPool((r: Runnable) => new Thread(r, "api-client")))
+  )
 
   lazy val webSocketClient = new ScalaWebSocketClient
-  lazy val httpClient = new ScalaHttpClient
-  lazy val threadDispatcher = new ScalaThreadDispatcher(ec)
+  lazy val httpClient = new ScalaHttpClient()(
+    ExecutionContext.fromExecutor(Executors.newCachedThreadPool((r: Runnable) => new Thread(r, "libcore-http-client")))
+  )
+  lazy val threadDispatcher = new ScalaThreadDispatcher(
+    ExecutionContext.fromExecutor(Executors.newCachedThreadPool((r: Runnable) => new Thread(r, "libcore-thread-dispatcher")))
+  )
   lazy val apiClient = apiC
 }

@@ -2,8 +2,7 @@ package co.ledger.wallet.daemon.modules
 
 import java.util.concurrent.TimeUnit
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
-import javax.inject.Singleton
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache}
 import co.ledger.wallet.daemon.services.{PoolsService, UsersService}
@@ -11,13 +10,13 @@ import com.google.inject.Provides
 import com.twitter.concurrent.NamedPoolThreadFactory
 import com.twitter.inject.{Injector, TwitterModule}
 import com.twitter.util.{Duration, ScheduledThreadPoolTimer, Time}
+import javax.inject.Singleton
 
-import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
 object DaemonCacheModule extends TwitterModule {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   @Singleton
   @Provides
@@ -37,8 +36,12 @@ object DaemonCacheModule extends TwitterModule {
       Try(Await.result(poolsService.syncOperations, 5.minutes)) match {
         case Success(result) =>
           result.foreach { r =>
-            if (r.syncResult) { info(s"Synchronization complete for $r") }
-            else { warn(s"Failed synchronizing $r") }
+            if (r.syncResult) {
+              info(s"Synchronization complete for $r")
+            }
+            else {
+              warn(s"Failed synchronizing $r")
+            }
           }
           val t1 = System.currentTimeMillis()
           info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")

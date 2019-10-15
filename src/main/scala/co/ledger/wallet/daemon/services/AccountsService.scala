@@ -1,6 +1,5 @@
 package co.ledger.wallet.daemon.services
 
-import co.ledger.wallet.daemon.utils.Utils.RichBigInt
 import java.util.{Date, UUID}
 
 import cats.data.OptionT
@@ -10,7 +9,7 @@ import cats.instances.option._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import co.ledger.core
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.clients.ApiClient.FallbackParams
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
@@ -20,23 +19,22 @@ import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
-import co.ledger.wallet.daemon.utils.Utils._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
+import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
 import com.twitter.finagle.Service
 import com.twitter.finagle.http.{Method, Request, Response}
 import javax.inject.{Inject, Singleton}
-import org.web3j.abi.{FunctionEncoder, TypeReference}
 import org.web3j.abi.datatypes.{Address, Function, Type, Uint}
+import org.web3j.abi.{FunctionEncoder, TypeReference}
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{Await, ExecutionContext, Future}
 import scala.concurrent.duration._
-import scala.util.{Success, Try}
+import scala.concurrent.{Await, Future}
 import scala.util.parsing.json.JSON
+import scala.util.{Success, Try}
 
 @Singleton
 class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   def accounts(walletInfo: WalletInfo): Future[Seq[AccountView]] = {
     daemonCache.withWallet(walletInfo) { wallet =>
@@ -183,7 +181,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
   def nextAccountCreationInfo(accountIndex: Option[Int], walletInfo: WalletInfo): Future[AccountDerivationView] =
     daemonCache.withWallet(walletInfo)(_.accountCreationInfo(accountIndex)).map(_.view)
 
-  def nextExtendedAccountCreationInfo(accountIndex: Option[Int], walletInfo: WalletInfo)(implicit ec: ExecutionContext): Future[AccountExtendedDerivationView] =
+  def nextExtendedAccountCreationInfo(accountIndex: Option[Int], walletInfo: WalletInfo): Future[AccountExtendedDerivationView] =
     daemonCache.withWallet(walletInfo)(_.accountExtendedCreation(accountIndex)).map(_.view)
 
   def accountOperations(queryParams: OperationQueryParams, accountInfo: AccountInfo): Future[PackedOperationsView] = {

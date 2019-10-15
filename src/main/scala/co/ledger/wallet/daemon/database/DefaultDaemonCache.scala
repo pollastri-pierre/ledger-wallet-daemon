@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.database
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.models.Account._
@@ -17,14 +17,12 @@ import slick.jdbc.JdbcBackend.Database
 
 import scala.collection.JavaConverters._
 import scala.collection._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 @Singleton
 class DefaultDaemonCache() extends DaemonCache with Logging {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   import DefaultDaemonCache._
-
 
   def dbMigration: Future[Unit] = {
     dbDao.migrate()
@@ -121,7 +119,6 @@ object DefaultDaemonCache extends Logging {
   private val users: concurrent.Map[String, User] = new ConcurrentHashMap[String, User]().asScala
 
   class User(val id: Long, val pubKey: String) extends Logging with GenCache {
-    implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
     private[this] val cachedPools: Cache[String, Pool] = newCache(initialCapacity = INITIAL_POOL_CAP_PER_USER)
     private[this] val self = this
 

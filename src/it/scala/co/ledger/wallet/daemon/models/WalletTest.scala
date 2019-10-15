@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.models
 import java.util.UUID
 
 import co.ledger.core
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency.RichCoreCurrency
@@ -12,12 +12,11 @@ import co.ledger.wallet.daemon.utils.NativeLibLoader
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
 
 class WalletTest extends AssertionsForJUnit {
   NativeLibLoader.loadLibs()
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   private val PUBKEYS = List[String](
     "0437bc83a377ea025e53eafcd18f299268d1cecae89b4f15401926a0f8b006c0f7ee1b995047b3e15959c5d10dd1563e22a2e6e4be9572aa7078e32f317677a901",

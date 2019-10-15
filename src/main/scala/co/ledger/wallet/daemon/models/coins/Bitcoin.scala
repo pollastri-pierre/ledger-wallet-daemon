@@ -4,16 +4,15 @@ import java.util.Date
 
 import co.ledger.core
 import co.ledger.core.implicits._
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.models.coins.Coin._
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.fasterxml.jackson.annotation.JsonProperty
 
 import scala.collection.JavaConverters._
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
 object Bitcoin {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   val currencyFamily = core.WalletType.BITCOIN
 
   def newNetworkParamsView(from: core.BitcoinLikeNetworkParameters): NetworkParamsView = {

@@ -1,7 +1,6 @@
 package co.ledger.wallet.daemon.controllers
 
-import javax.inject.Inject
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RequestWithUser, WithPoolInfo}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
@@ -12,11 +11,9 @@ import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 import com.twitter.finatra.validation.{MethodValidation, NotEmpty, ValidationResult}
-
-import scala.concurrent.ExecutionContext
+import javax.inject.Inject
 
 class WalletPoolsController @Inject()(poolsService: PoolsService) extends Controller {
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
 
   import WalletPoolsController._
 

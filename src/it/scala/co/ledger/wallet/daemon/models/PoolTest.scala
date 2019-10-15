@@ -1,18 +1,17 @@
 package co.ledger.wallet.daemon.models
 
-import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext
+import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.database.PoolDto
 import co.ledger.wallet.daemon.utils.NativeLibLoader
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
+import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
 
 class PoolTest extends AssertionsForJUnit {
 
   NativeLibLoader.loadLibs()
-  implicit val ec: ExecutionContext = MDCPropagatingExecutionContext.Implicits.global
   private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
   private val notExistingWallet = Await.result(testPool.wallet("not_exist"), Duration.Inf)
   private val samePool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
