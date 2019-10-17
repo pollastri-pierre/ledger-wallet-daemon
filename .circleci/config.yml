@@ -54,7 +54,7 @@ jobs:
           name: Run scalastyle
           command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt scalastyle
 
-  unit_tests:
+  integration_tests:
     docker:
       - image: ledgerhq/sbt-openjdk-8
         environment:
@@ -67,8 +67,8 @@ jobs:
       - checkout
       - restore_cache: *dependencies_cache
       - run:
-          name: Run unit tests
-          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt test
+          name: Run integration tests
+          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt it:test
 
 
 workflows:
@@ -78,7 +78,7 @@ workflows:
           filters: *filter_all_tags
       - scala_linter:
           filters: *filter_all_tags
-      - unit_tests:
+      - integration_tests:
           requires:
             - compile
           filters: *filter_all_tags
