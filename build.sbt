@@ -95,6 +95,7 @@ lazy val versions = new {
   val tyrus      = "1.13.1"
   val websocket  = "1.1"
   val web3j      = "4.5.1"
+  val guava = "28.1-jre"
 }
 // scalastyle:on
 
@@ -121,6 +122,7 @@ lazy val root = (project in file("."))
       "javax.websocket"              % "javax.websocket-api"     % versions.websocket % "provided",
       "org.web3j"                     % "abi"                    % versions.web3j,
       "org.web3j"                     % "core"                   % versions.web3j,
+      "com.google.guava"              % "guava"                  % versions.guava,
 
       // Tests dependencies
       "org.specs2"                   %% "specs2-mock"            % versions.specs2     % "it",

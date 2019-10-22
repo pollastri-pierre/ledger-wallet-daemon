@@ -118,8 +118,8 @@ object DefaultDaemonCache extends Logging {
   private[database] val opsCache: OperationCache = new OperationCache()
   private val users: concurrent.Map[String, User] = new ConcurrentHashMap[String, User]().asScala
 
-  class User(val id: Long, val pubKey: String) extends Logging with GenCache {
-    private[this] val cachedPools: Cache[String, Pool] = newCache(initialCapacity = INITIAL_POOL_CAP_PER_USER)
+  class User(val id: Long, val pubKey: String) extends Logging {
+    private[this] val cachedPools: concurrent.Map[String, Pool] = new ConcurrentHashMap[String, Pool]().asScala
     private[this] val self = this
 
     def sync(): Future[Seq[SynchronizationResult]] = {

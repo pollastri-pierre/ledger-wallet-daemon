@@ -3,17 +3,29 @@ package co.ledger.wallet.daemon.database
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicLong
 
-import javax.inject.Singleton
 import co.ledger.wallet.daemon.exceptions.OperationNotFoundException
-import co.ledger.wallet.daemon.models.GenCache
 import co.ledger.wallet.daemon.services.LogMsgMaker
-import co.ledger.wallet.daemon.utils.Utils
 import com.twitter.inject.Logging
+import javax.inject.Singleton
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConverters._
+import java.time.Duration
 
-import scala.collection.mutable
+import com.google.common.cache.CacheBuilder
+
+import scala.collection._
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 
 @Singleton
-class OperationCache extends Logging with GenCache {
+class OperationCache extends Logging {
+
+  type Cache[K, V] = concurrent.Map[K, V]
+
+  private def newCache[K <: AnyRef, V <: AnyRef]: Cache[K, V] =
+    CacheBuilder.newBuilder()
+      .maximumSize(DaemonConfiguration.paginationTokenMaxSize)
+      .expireAfterAccess(Duration.ofMinutes(DaemonConfiguration.paginationTokenTtlMin))
+      .build[K, V]().asMap().asScala
 
   /**
     * Create and insert an operation query record.
@@ -143,13 +155,13 @@ class OperationCache extends Logging with GenCache {
   }
 
   private def newPoolTreeInstance(pool: Long, wallet: String, account: Int, operation: UUID): PoolTree = {
-    val wallets: Cache[String, WalletTree] = newCache(initialCapacity = INITIAL_WALLET_CAP_PER_POOL)
+    val wallets: Cache[String, WalletTree] = newCache
     wallets.put(wallet, newWalletTreeInstance(wallet, account, operation))
     new PoolTree(pool, wallets)
   }
-  private[this] val cache: Cache[UUID, AtomicRecord] = newCache(initialCapacity = INITIAL_OPERATION_CAP)
-  private[this] val nexts: Cache[UUID, UUID] = newCache(initialCapacity = INITIAL_OPERATION_CAP)
-  private[this] val poolTrees: Cache[Long, PoolTree] = newCache(initialCapacity = INITIAL_POOL_CAP_PER_USER)
+  private[this] val cache: Cache[UUID, AtomicRecord] = newCache[UUID, AtomicRecord]
+  private[this] val nexts: Cache[UUID, UUID] = newCache[UUID, UUID]
+  private[this] val poolTrees: Cache[java.lang.Long, PoolTree] = new ConcurrentHashMap[java.lang.Long, PoolTree].asScala
 
   class PoolTree(val poolId: Long, val wallets: Cache[String, WalletTree]) {
 
@@ -164,32 +176,32 @@ class OperationCache extends Logging with GenCache {
   }
 
   def newWalletTreeInstance(walletName: String, accountIndex: Int, operation: UUID): WalletTree = {
-    val accounts: Cache[Int, AccountTree] = newCache(initialCapacity = INITIAL_ACCOUNT_CAP_PER_WALLET / 100)
+    val accounts: Cache[java.lang.Integer, AccountTree] = newCache[java.lang.Integer, AccountTree]
     accounts.put(accountIndex, newAccountTreeInstance(accountIndex, operation))
     new WalletTree(walletName, accounts)
   }
 
-  class WalletTree(val walletName: String, val accounts: Cache[Int, AccountTree]) {
+  class WalletTree(val walletName: String, val accounts: Cache[java.lang.Integer, AccountTree]) {
 
     def insertOperation(account: Int, operation: UUID): Unit = accounts.get(account) match {
       case Some(tree) => tree.insertOperation(operation)
       case None => accounts.put(account, newAccountTreeInstance(account, operation))
     }
 
-    def operations(account: Int): Set[UUID] = if (accounts.contains(account)) accounts(account).operations.toSet else Set.empty[UUID]
+    def operations(account: Int): Set[UUID] = if (accounts.contains(account)) accounts(account).operations.keys.toSet else Set.empty[UUID]
 
-    def operations: Set[UUID] = accounts.values.flatMap { account => account.operations }.toSet
+    def operations: Set[UUID] = accounts.values.flatMap { account => account.operations.keys }.toSet
   }
 
   def newAccountTreeInstance(index: Int, operation: UUID): AccountTree = {
-    new AccountTree(index, Utils.newConcurrentSet[UUID] += operation)
+    new AccountTree(index, newCache[UUID, java.lang.Boolean] += (operation -> true))
   }
 
-  class AccountTree(val index: Int, val operations: mutable.Set[UUID]) {
+  class AccountTree(val index: Int, val operations: Cache[UUID, java.lang.Boolean]) {
 
     def containsOperation(operationId: UUID): Boolean = operations.contains(operationId)
 
-    def insertOperation(operationId: UUID): operations.type = operations += operationId
+    def insertOperation(operationId: UUID): operations.type = operations += (operationId -> true)
   }
 
   class AtomicRecord(val id: UUID,

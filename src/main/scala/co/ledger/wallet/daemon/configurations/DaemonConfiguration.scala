@@ -85,6 +85,16 @@ object DaemonConfiguration {
     if (config.hasPath("realtimeobservation")) { config.getBoolean("realtimeobservation") }
     else { false }
 
+  // The expire time in minutes of the pagination token used for querying operations
+  val paginationTokenTtlMin: Int =
+    if (config.hasPath("pagination_token.ttl_min")) { config.getInt("pagination_token.ttl_min") }
+    else { 3 }
+
+  // The maximum size of pagination token cache
+  val paginationTokenMaxSize: Long =
+    if (config.hasPath("pagination_token.ttl_min")) { config.getInt("pagination_token.max_size") }
+    else { 1000 * 1000 }
+
   val isPrintCoreLibLogsEnabled: Boolean = config.hasPath("debug.print_core_logs") && config.getBoolean("debug.print_core_logs")
 
   lazy val coreDataPath: String = Try(config.getString("core_data_path")).getOrElse("./core_data")
