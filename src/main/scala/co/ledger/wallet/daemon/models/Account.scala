@@ -8,11 +8,11 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import co.ledger.core
 import co.ledger.core._
-import co.ledger.core.implicits.{UnsupportedOperationException, _}
+import co.ledger.core.implicits.{InvalidEIP55FormatException, NotEnoughFundsException, UnsupportedOperationException, _}
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.controllers.TransactionsController.{BTCTransactionInfo, ETHTransactionInfo, TransactionInfo, XRPTransactionInfo}
-import co.ledger.wallet.daemon.exceptions.{ERC20BalanceNotEnough, ERC20NotFoundException, SignatureSizeUnmatchException}
+import co.ledger.wallet.daemon.exceptions.{ERC20BalanceNotEnough, ERC20NotFoundException, InvalidEIP55Format, SignatureSizeUnmatchException}
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
@@ -245,23 +245,22 @@ object Account extends Logging {
   private def erc20TransactionBuilder(ti: ETHTransactionInfo, a: core.Account, c: core.Currency, contract: String)(implicit ec: ExecutionContext): Future[EthereumLikeTransactionBuilder] = {
     a.asEthereumLikeAccount().getERC20Accounts.asScala.find(_.getToken.getContractAddress == contract) match {
       case Some(erc20Account) =>
-        erc20Account.getBalance().flatMap { balance =>
-          if (balance.asScala >= ti.amount) {
-            for {
-              inputData <- erc20Account.getTransferToAddressData(BigInt.fromIntegerString(ti.amount.toString(10), 10), ti.recipient)
-              v = a.asEthereumLikeAccount()
-                .buildTransaction()
-                .sendToAddress(c.convertAmount(0), contract)
-                .setInputData(inputData)
-              gasLimit <- ti.gasLimit match {
-                case Some(amount) => Future.successful(amount)
-                case None => ClientFactory.apiClient.getGasLimit(
-                  c.getName, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
-              }
-            } yield v.setGasLimit(c.convertAmount(gasLimit))
-          } else {
-            Future.failed(ERC20BalanceNotEnough(erc20Account.getToken.getContractAddress, balance.asScala, ti.amount))
+        for {
+          inputData <- erc20Account.getTransferToAddressData(BigInt.fromIntegerString(ti.amount.toString(10), 10), ti.recipient).recoverWith {
+            case _: InvalidEIP55FormatException => Future.failed(InvalidEIP55Format(ti.recipient))
+            case _: NotEnoughFundsException => Future.failed(ERC20BalanceNotEnough(contract, 0, ti.amount))
           }
+          gasLimit <- ti.gasLimit match {
+            case Some(amount) => Future.successful(amount)
+            case None => ClientFactory.apiClient.getGasLimit(
+              c.getName, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
+          }
+        } yield {
+          a.asEthereumLikeAccount()
+            .buildTransaction()
+            .setGasLimit(c.convertAmount(gasLimit))
+            .sendToAddress(c.convertAmount(0), contract)
+            .setInputData(inputData)
         }
       case None => Future.failed(ERC20BalanceNotEnough(contract, 0, ti.amount))
     }
