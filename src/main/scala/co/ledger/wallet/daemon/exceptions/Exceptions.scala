@@ -13,6 +13,12 @@ case class ERC20BalanceNotEnough(tokenAddress: String, balance: BigInt, need: Bi
     val code = ErrorCodes.ERC20_BALANCE_NOT_ENOUGH
   } with Exception(msg) with DaemonException
 
+case class InvalidEIP55Format(address: String)
+  extends {
+    val msg = s"Invalid address : Invalid EIP55 format $address"
+    val code = ErrorCodes.CORE_BAD_REQUEST
+  } with Exception(msg) with DaemonException
+
 case class AccountNotFoundException(accountIndex: Int) extends {
   val msg = s"Account with index $accountIndex doesn't exist"
   val code = ErrorCodes.ACCOUNT_NOT_FOUND
