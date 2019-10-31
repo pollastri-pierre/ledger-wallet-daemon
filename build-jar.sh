@@ -14,17 +14,21 @@ COMMAND=$1
 OPT_COMMAND=$2
 
 DOCKER_NAME=lib-core-cmake
-INTERFACE_GEN_DIR=$CURRENT_DIR/tools/generate_interfaces.sh
 MACOS_BUILD_DIR=$CURRENT_DIR/../lib-ledger-core-build
 LINUX_BUILD_DIR=$CURRENT_DIR/../lib-ledger-core-build-linux
 JAR_BUILD_DIR=$CURRENT_DIR/../build-jar
 LIBCORE_AWS_URL_BASE="https://s3-eu-west-1.amazonaws.com/ledger-lib-ledger-core"
-LIBCORE_VERSION="3.1.0-rc-494eed"
+LIBCORE_VERSION="3.1.0-rc-8c9659"
+LIBCORE_DL_DIR=$CURRENT_DIR/../lib-ledger-core-dl
+LIBCORE_SRC_DIR=$CURRENT_DIR/../lib-ledger-core
+INTERFACE_GEN_DIR=tools/generate_interfaces.sh
 
 function gen_interface()
 {
   rm -v -rf $CURRENT_DIR/api
+  cd $LIBCORE_SRC_DIR
   bash $INTERFACE_GEN_DIR
+  cd -
 }
 
 function clean_src()
@@ -100,8 +104,8 @@ function build_jar()
   gen_interface
   rm -v -rf $JAR_BUILD_DIR
   mkdir -v $JAR_BUILD_DIR
-  JAVA_API_DIR=$CURRENT_DIR/api/core/java
-  SCALA_API_DIR=$CURRENT_DIR/api/core/scala
+  JAVA_API_DIR=$LIBCORE_SRC_DIR/api/core/java
+  SCALA_API_DIR=$LIBCORE_SRC_DIR/api/core/scala
   RESOURCE_DIR=$JAR_BUILD_DIR/src/main/resources/resources/djinni_native_libs
 
   mkdir -v -p $RESOURCE_DIR
