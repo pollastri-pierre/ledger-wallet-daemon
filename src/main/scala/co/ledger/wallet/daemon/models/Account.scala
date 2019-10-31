@@ -160,7 +160,7 @@ object Account extends Logging {
     } yield result
 
   private def batchedErc20Operations(a: core.ERC20LikeAccount, offset: Long, batch: Int)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
-    a.queryOperations().offset(offset).limit(batch).complete().execute().map(_.asScala.toList).map { coreOps =>
+    a.queryOperations().offset(offset).limit(batch).addOrder(OperationOrderKey.DATE, true).complete().execute().map(_.asScala.toList).map { coreOps =>
       val hashToERC20 = a.getOperations.asScala.toList.map(erc20Op => erc20Op.getHash -> erc20Op).toMap
       coreOps.map(coreOp => (coreOp, hashToERC20(coreOp.asEthereumLikeOperation().getTransaction.getHash)))
     }
