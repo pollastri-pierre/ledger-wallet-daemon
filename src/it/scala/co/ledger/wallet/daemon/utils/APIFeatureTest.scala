@@ -9,10 +9,11 @@ import co.ledger.wallet.daemon.services.ECDSAService
 import com.lambdaworks.codec.Base64
 import com.twitter.finagle.http.{Response, Status}
 import com.twitter.finatra.http.EmbeddedHttpServer
+import com.twitter.inject.Logging
 import com.twitter.inject.server.FeatureTest
 import org.bitcoinj.core.Sha256Hash
 
-trait APIFeatureTest extends FeatureTest {
+trait APIFeatureTest extends FeatureTest with Logging {
   override val server = new EmbeddedHttpServer(new ServerImpl)
   def defaultHeaders = lwdBasicAuthorisationHeader("whitelisted")
   def parse[A](response: Response)(implicit manifest: Manifest[A]): A = server.mapper.parse[A](response)
@@ -75,7 +76,7 @@ trait APIFeatureTest extends FeatureTest {
 
   private def cleanup(): Unit = {
     val directory = new ScalaPathResolver("").installDirectory
-    println(s"CLEAN UP ${directory.toString}")
+    info(s"CLEAN UP ${directory.toString}")
     for (f <- directory.listFiles()) {
       if (f.isDirectory) {
         deleteDirectory(f)
