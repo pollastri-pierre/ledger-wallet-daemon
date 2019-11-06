@@ -5,6 +5,18 @@ import com.twitter.finagle.http.{Response, Status}
 
 class TransactionsApiTest extends APIFeatureTest {
 
+  val poolName = "ledger"
+
+  override def beforeAll(): Unit = {
+    super.beforeAll()
+    createPool(poolName)
+  }
+
+  override def afterAll(): Unit = {
+    deletePool(poolName)
+    super.afterAll()
+  }
+
   // FIXME: Broken test
   /*
   test("TransactionsApi#Create and sign transaction") {
@@ -76,8 +88,6 @@ class TransactionsApiTest extends APIFeatureTest {
   */
 
   test("AccountsApi#Broadcast signed transaction") {
-    val poolName = "ledger"
-    createPool(poolName)
     assertWalletCreation(poolName, "bitcoin_testnet", "bitcoin_testnet", Status.Ok)
     assertCreateAccount(ACCOUNT_BODY, poolName, "bitcoin_testnet", Status.Ok)
     assertSyncPool(Status.Ok)
