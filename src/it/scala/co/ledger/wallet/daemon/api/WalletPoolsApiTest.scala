@@ -10,14 +10,24 @@ class WalletPoolsApiTest extends APIFeatureTest {
 
   test("WalletPoolsApi#Create and list single pool") {
     createPool("my_pool")
-    val pools = parse[List[models.WalletPoolView]](getPools())
-    val pool = parse[models.WalletPoolView](getPool("my_pool"))
-    assert(pools.contains(pool))
-    deletePool("my_pool")
+    try {
+      val pools = parse[List[models.WalletPoolView]](getPools())
+      val pool = parse[models.WalletPoolView](getPool("my_pool"))
+      assert(pools.contains(pool))
+    } finally {
+      deletePool("my_pool")
+    }
   }
 
   test("WalletPoolsApi#Create pool with invalid name") {
-    createPool("my_pool; drop table my_pool,", Status.BadRequest)
+    val wrongName = "my_pool; drop table my_pool,"
+    try {
+      createPool(wrongName, Status.BadRequest)
+      // TODO : Check that the pool has not been created
+    } finally {
+      // If status is Status.BadRequest, this do nothing
+      deletePool(wrongName)
+    }
   }
 
   test("WalletPoolsApi#Create and list multiple pool") {
