@@ -154,16 +154,6 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
   def getXpub(accountInfo: AccountInfo): Future[String] =
     daemonCache.withAccount(accountInfo) { a => Future.successful(a.getRestoreKey) }
 
-  def getERC20Operations(tokenAccountInfo: TokenAccountInfo): Future[List[OperationView]] =
-    daemonCache.withAccountAndWallet(tokenAccountInfo.accountInfo) {
-      case (account, wallet) =>
-        account.erc20Operations(tokenAccountInfo.tokenAddress).flatMap { operations =>
-          operations.traverse { case (coreOp, erc20Op) =>
-            Operations.getErc20View(erc20Op, coreOp, wallet, account)
-          }
-        }
-    }
-
   def getERC20Operations(accountInfo: AccountInfo): Future[List[OperationView]] =
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) =>

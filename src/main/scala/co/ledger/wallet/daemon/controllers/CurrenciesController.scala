@@ -4,13 +4,14 @@ import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.gl
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RequestWithUser, WithPoolInfo}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.services.CurrenciesService
-import com.twitter.finagle.http.Request
-import com.twitter.finatra.http.Controller
+import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 import javax.inject.Inject
 
-class CurrenciesController @Inject()(currenciesService: CurrenciesService) extends Controller {
+import scala.concurrent.Future
+
+class CurrenciesController @Inject()(currenciesService: CurrenciesService) extends WDController {
 
   import CurrenciesController._
 
@@ -20,7 +21,8 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
     * Name should be lowercase and predefined by core library.
     *
     */
-  get("/pools/:pool_name/currencies/:currency_name") { request: GetCurrencyRequest =>
+  deprecated(get[GetCurrencyRequest, Future[Response]], "/pools/:pool_name/currencies/:currency_name", callback =
+    { request: GetCurrencyRequest =>
     val currencyName = request.currency_name
     info(s"GET currency $request")
     currenciesService.currency(currencyName, request.poolInfo).map {
@@ -28,13 +30,13 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
       case None => ResponseSerializer.serializeNotFound(
         Map("response" -> "Currency not support", "currency_name" -> currencyName), response)
     }
-  }
+  })
 
   /**
     * End point queries for currencies view belongs to pool specified by pool name.
     *
     */
-  get("/pools/:pool_name/currencies") { request: GetCurrenciesRequest =>
+  get("/pools/:pool_name/currencies")  { request: GetCurrenciesRequest =>
     info(s"GET currencies $request")
     currenciesService.currencies(request.poolInfo)
   }
@@ -45,7 +47,7 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
     *
     */
   get("/pools/:pool_name/currencies/:currency_name/validate") { request: AddressValidatingRequest =>
-    currenciesService.validateAddress(request.address, request.currency_name, request.poolInfo)
+      currenciesService.validateAddress(request.address, request.currency_name, request.poolInfo)
   }
 
 }
