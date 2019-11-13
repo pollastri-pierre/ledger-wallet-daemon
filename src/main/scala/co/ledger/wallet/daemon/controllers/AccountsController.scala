@@ -10,19 +10,19 @@ import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
 import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.filters.ExtendedAccountCreationContext._
-import co.ledger.wallet.daemon.filters.{AccountCreationFilter, AccountExtendedCreationFilter}
+import co.ledger.wallet.daemon.filters.{AccountCreationFilter, AccountExtendedCreationFilter, DeprecatedRouteFilter}
 import co.ledger.wallet.daemon.models.Account._
-import co.ledger.wallet.daemon.models.Operations.OperationView
-import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountExtendedDerivationView, AccountView, ERC20AccountView, TokenAccountInfo}
+import co.ledger.wallet.daemon.models.TokenAccountInfo
 import co.ledger.wallet.daemon.services.{AccountsService, OperationQueryParams}
-import com.twitter.finagle.http.{Request, Response}
+import com.twitter.finagle.http.Request
+import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.{QueryParam, RouteParam}
 import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 import javax.inject.Inject
 
 import scala.concurrent.Future
 
-class AccountsController @Inject()(accountsService: AccountsService) extends WDController {
+class AccountsController @Inject()(accountsService: AccountsService) extends Controller {
 
   import AccountsController._
 
@@ -35,40 +35,36 @@ class AccountsController @Inject()(accountsService: AccountsService) extends WDC
     }
 
     // End point queries for derivation information view of next account creation.
-    deprecated(get[AccountCreationInfoRequest, Future[AccountDerivationView]],
-      "/accounts/next", callback = { request: AccountCreationInfoRequest =>
-        info(s"GET account creation info $request")
-        accountsService.nextAccountCreationInfo(request.account_index, request.walletInfo)
-      })
+    filter[DeprecatedRouteFilter].get("/accounts/next") { request: AccountCreationInfoRequest =>
+      info(s"GET account creation info $request")
+      accountsService.nextAccountCreationInfo(request.account_index, request.walletInfo)
+    }
 
     // End point to create a new account within the specified pool and wallet.
-    deprecated(filter[AccountCreationFilter]
-      .post[AccountsRequest, Future[AccountView]],
-      "/accounts", callback = { request: AccountsRequest =>
+    filter[DeprecatedRouteFilter].filter[AccountCreationFilter]
+      .post("/accounts") { request: AccountsRequest =>
         info(s"CREATE account $request, " +
           s"Parameters(user: ${request.user.id}, pool_name: ${request.pool_name}, wallet_name: ${request.wallet_name}), " +
           s"Body(${request.request.accountCreationBody}")
         accountsService.createAccount(request.request.accountCreationBody, request.walletInfo)
-      })
+      }
 
     // End point to create a new account within the specified pool and wallet with extended keys info.
-    deprecated(filter[AccountExtendedCreationFilter]
-      .post[AccountsRequest, Future[AccountView]],
-      "/accounts/extended", callback = { request: AccountsRequest =>
+    filter[DeprecatedRouteFilter].filter[AccountExtendedCreationFilter]
+      .post("/accounts/extended") { request: AccountsRequest =>
         info(s"CREATE account ${request.request}, " +
           s"Parameters(user: ${request.user.id}, pool_name: ${request.pool_name}, wallet_name: ${request.wallet_name}), " +
           s"Body(${request.request.accountExtendedCreationBody}")
         accountsService.createAccountWithExtendedInfo(request.request.accountExtendedCreationBody, request.walletInfo)
-      })
+      }
 
     // End point queries for derivation information view of next account creation (with extended key).
-    deprecated(get[AccountCreationInfoRequest, Future[AccountExtendedDerivationView]],
-      "/accounts/next_extended", callback = { request: AccountCreationInfoRequest =>
-        info(s"GET account creation info $request")
-        accountsService.nextExtendedAccountCreationInfo(request.account_index, request.walletInfo)
-      })
+    filter[DeprecatedRouteFilter].get("/accounts/next_extended") { request: AccountCreationInfoRequest =>
+      info(s"GET account creation info $request")
+      accountsService.nextExtendedAccountCreationInfo(request.account_index, request.walletInfo)
+    }
 
-    get("/accounts/:account_index") { request: AccountRequest =>
+    filter[DeprecatedRouteFilter].get("/accounts/:account_index") { request: AccountRequest =>
       info(s"GET account $request")
       accountsService.account(request.accountInfo).map {
         case Some(view) => ResponseSerializer.serializeOk(view, response)
@@ -93,13 +89,11 @@ class AccountsController @Inject()(accountsService: AccountsService) extends WDC
         accountsService.accountFreshAddresses(request.accountInfo)
       }
 
-
       // End point queries for derivation path with specified pool, wallet name and unique account index.
-      deprecated(get[AccountRequest, Future[String]],
-        "/path", callback = { request: AccountRequest =>
-          info(s"GET account derivation path $request")
-          accountsService.accountDerivationPath(request.accountInfo)
-        })
+      filter[DeprecatedRouteFilter].get("/path") { request: AccountRequest =>
+        info(s"GET account derivation path $request")
+        accountsService.accountDerivationPath(request.accountInfo)
+      }
 
       // End point queries for operation views with specified pool, wallet name, and unique account index.
       get("/operations") { request: OperationsRequest =>
@@ -125,22 +119,21 @@ class AccountsController @Inject()(accountsService: AccountsService) extends WDC
       }
 
       // End point queries for operation view with specified uid, return the first operation of this account if uid is 'first'.
-      deprecated(get[OperationRequest, Future[Response]],
-        "/operations/:uid", callback = { request: OperationRequest =>
-          info(s"GET account operation $request")
-          request.uid match {
-            case "first" => accountsService.firstOperation(request.accountInfo)
-              .map {
-                case Some(view) => ResponseSerializer.serializeOk(view, response)
-                case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account is empty"), response)
-              }
-            case _ => accountsService.accountOperation(request.uid, request.full_op, request.accountInfo)
-              .map {
-                case Some(view) => ResponseSerializer.serializeOk(view, response)
-                case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account operation doesn't exist", "uid" -> request.uid), response)
-              }
-          }
-        })
+      filter[DeprecatedRouteFilter].get("/operations/:uid") { request: OperationRequest =>
+        info(s"GET account operation $request")
+        request.uid match {
+          case "first" => accountsService.firstOperation(request.accountInfo)
+            .map {
+              case Some(view) => ResponseSerializer.serializeOk(view, response)
+              case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account is empty"), response)
+            }
+          case _ => accountsService.accountOperation(request.uid, request.full_op, request.accountInfo)
+            .map {
+              case Some(view) => ResponseSerializer.serializeOk(view, response)
+              case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account operation doesn't exist", "uid" -> request.uid), response)
+            }
+        }
+      }
 
       // Return the balances and operation counts history in the order of the starting time to the end time.
       get("/history") { request: HistoryRequest =>
@@ -164,16 +157,14 @@ class AccountsController @Inject()(accountsService: AccountsService) extends WDC
       }
 
       // operations of all tokens on this account
-      deprecated(get[AccountRequest, Future[List[OperationView]]],
-        "/tokens/operations", callback = { request: AccountRequest =>
-          accountsService.getERC20Operations(request.accountInfo)
-        })
+      filter[DeprecatedRouteFilter].get("/tokens/operations") { request: AccountRequest =>
+        accountsService.getERC20Operations(request.accountInfo)
+      }
 
       // given token address, get the token on this account
-      deprecated(get[TokenAccountRequest, Future[ERC20AccountView]],
-        "/tokens/:token_address", callback = { request: TokenAccountRequest =>
-          accountsService.getTokenAccount(request.tokenAccountInfo)
-        })
+      filter[DeprecatedRouteFilter].get("/tokens/:token_address") { request: TokenAccountRequest =>
+        accountsService.getTokenAccount(request.tokenAccountInfo)
+      }
 
       // Return the balances and operation counts history of token accounts in the order of the starting time to the end time.
       get("/tokens/:token_address/history") { request: TokenHistoryRequest =>

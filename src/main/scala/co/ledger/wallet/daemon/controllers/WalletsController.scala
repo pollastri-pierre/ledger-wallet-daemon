@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.controllers
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RequestWithUser, WithPoolInfo, WithWalletInfo}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
+import co.ledger.wallet.daemon.filters.DeprecatedRouteFilter
 import co.ledger.wallet.daemon.services.WalletsService
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.Request
@@ -29,7 +30,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
     * End point queries for wallet view in specified pool by it's name.
     *
     */
-  get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
+  filter[DeprecatedRouteFilter].get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
     info(s"GET wallet $request")
     walletsService.wallet(request.walletInfo).map {
       case Some(view) => ResponseSerializer.serializeOk(view, response)
@@ -93,4 +94,5 @@ object WalletsController {
     @MethodValidation
     def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
   }
+
 }
