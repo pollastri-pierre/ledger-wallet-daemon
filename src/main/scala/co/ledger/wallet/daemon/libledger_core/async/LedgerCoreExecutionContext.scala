@@ -39,7 +39,7 @@ object LedgerCoreExecutionContext {
   )
 
   def newSerialQueue(prefix: String): LedgerCoreExecutionContext = apply(
-    new SerialExecutionContextWrapper(prefix,
+    new SerialExecutionContextWrapper(
       ExecutionContext.fromExecutorService(
         new ThreadPoolExecutor(0, 1, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable],
           new ThreadFactory {

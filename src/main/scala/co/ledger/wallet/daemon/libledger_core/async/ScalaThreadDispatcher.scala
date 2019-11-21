@@ -4,7 +4,6 @@ import java.util.concurrent.ConcurrentHashMap
 
 import co.ledger.core.{Lock, ThreadDispatcher}
 
-import scala.collection.mutable
 import scala.concurrent.ExecutionContext
 
 class ScalaThreadDispatcher(mainContext: ExecutionContext) extends ThreadDispatcher {
@@ -15,12 +14,15 @@ class ScalaThreadDispatcher(mainContext: ExecutionContext) extends ThreadDispatc
   override def getSerialExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
     _poolsSerial.computeIfAbsent(name, name => LedgerCoreExecutionContext.newSerialQueue(name))
   }
+
   override def getThreadPoolExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
     _pools.computeIfAbsent(name, name => LedgerCoreExecutionContext.newThreadPool(name))
   }
+
   override def getMainExecutionContext: co.ledger.core.ExecutionContext = _mainContext
 
   // scalastyle:off
   override def newLock(): Lock = ???
+
   // scalastyle:on
 }

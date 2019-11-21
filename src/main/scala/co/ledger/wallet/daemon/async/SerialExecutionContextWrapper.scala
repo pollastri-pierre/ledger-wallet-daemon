@@ -1,8 +1,8 @@
 package co.ledger.wallet.daemon.async
 
-import scala.concurrent.{ExecutionContext}
+import scala.concurrent.ExecutionContext
 
-class SerialExecutionContextWrapper(prefix: String, ec: ExecutionContext) extends ExecutionContext with MDCPropagatingExecutionContext {
+class SerialExecutionContextWrapper(ec: ExecutionContext) extends ExecutionContext with MDCPropagatingExecutionContext {
   override def execute(runnable: Runnable): Unit = {
     ec.execute(runnable)
   }
