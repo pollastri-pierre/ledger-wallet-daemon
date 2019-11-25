@@ -21,6 +21,8 @@ import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
+import com.google.common.cache.{CacheBuilder, CacheLoader}
+
 import com.twitter.finagle.Service
 import com.twitter.finagle.http.{Method, Request, Response}
 import javax.inject.{Inject, Singleton}
@@ -35,6 +37,19 @@ import scala.util.{Success, Try}
 
 @Singleton
 class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
+
+  case class CacheKey(a: AccountInfo, contract: Option[String])
+
+  // Caching Future result of getBalance in order to share same Future to every requests
+  private val balanceCache =
+    CacheBuilder.newBuilder()
+      .maximumSize(DaemonConfiguration.balanceCacheMaxSize)
+      .expireAfterWrite(java.time.Duration.ofMinutes(DaemonConfiguration.balanceCacheTtlMin))
+      .build[CacheKey, Future[BigInt]](new CacheLoader[CacheKey, Future[BigInt]] {
+        def load(key: CacheKey): Future[BigInt] = {
+          loadBalance(key.contract, key.a)
+        }
+      })
 
   def accounts(walletInfo: WalletInfo): Future[Seq[AccountView]] = {
     daemonCache.withWallet(walletInfo) { wallet =>
@@ -64,7 +79,11 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.getAccount(accountInfo: AccountInfo)
   }
 
-  def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
+  def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] =
+    balanceCache.get(CacheKey(accountInfo, contract))
+
+
+  private def loadBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
 
     def encodeBalanceFunction(address: String): Try[String] = {
       info(s"Try to encode balance function with address: $address")
@@ -76,7 +95,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       Try(FunctionEncoder.encode(function))
     }
 
-    def runWithFallback(cb: Future[BigInt], fallback: FallbackParams, client: Service[Request, Response], timeout: Duration): Future[BigInt] = {
+    def runWithFallback(cb: Future[BigInt], fallback: FallbackParams, client: Service[Request, Response], timeout: scala.concurrent.duration.Duration): Future[BigInt] = {
       Future(Await.result(cb, timeout)).recoverWith { case t =>
         warn(s"Failed to get balance from libcore: $t")
         info("Using fallback provider")
@@ -109,10 +128,15 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       }
     }
 
-    val balance = daemonCache.withAccount(accountInfo)(a => contract match {
-      case Some(c) => a.erc20Balance(c)
-      case None => a.balance
-    })
+    debug(s"Retrieve balance for $accountInfo - Contract : $contract")
+    val balance = {
+      daemonCache.withAccount(accountInfo)(a => {
+        contract match {
+          case Some(c) => a.erc20Balance(c)
+          case None => a.balance
+        }
+      })
+    }
 
     daemonCache.withWallet(accountInfo.walletInfo) { wallet =>
       ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName) match {

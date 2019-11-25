@@ -95,6 +95,16 @@ object DaemonConfiguration {
     if (config.hasPath("pagination_token.ttl_min")) { config.getInt("pagination_token.max_size") }
     else { 1000 * 1000 }
 
+  // The expire time in minutes of the balance per account
+  val balanceCacheTtlMin: Int =
+    if (config.hasPath("balance.cache.ttl_min")) { config.getInt("balance.cache.ttl_min") }
+    else { 1 }
+
+  // The maximum size of pagination token cache
+  val balanceCacheMaxSize: Long =
+    if (config.hasPath("balance.cache.max_size")) { config.getInt("balance.cache.max_size") }
+    else {1000}
+
   val isPrintCoreLibLogsEnabled: Boolean = config.hasPath("debug.print_core_logs") && config.getBoolean("debug.print_core_logs")
 
   lazy val coreDataPath: String = Try(config.getString("core_data_path")).getOrElse("./core_data")

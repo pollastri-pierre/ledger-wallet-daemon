@@ -109,22 +109,29 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
           }
         })
       }
+  lazy private val fallbackClientServices: Map[String, (FallbackParams, Service[Request, Response])] = {
+    DaemonConfiguration.explorer.api.paths
+      .mapValues{ config =>
+        for {
+          f <- config.filterPrefix.fallback
+          r <- f.split("/", 2).toList match {
+            case host :: query :: _ =>
+              val c = DaemonConfiguration.proxy match {
+                case Some(proxy) => client.withTransport.httpProxyTo(s"${host}:443").withTls(host).newService(s"${proxy.host}:${proxy.port}")
+                case None => client.withTls(host).newService(s"${host}:443")
+              }
+              Some(FallbackParams(s"${host}:443", "/" + query), c)
+            case _ =>
+              None
+          }
+        } yield r
+      }.collect{
+        case (currency, opt) if opt.isDefined => (currency, opt.get)
+      }
+  }
 
   def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
-    for {
-      config <- DaemonConfiguration.explorer.api.paths.get(currency)
-      fallback <- config.filterPrefix.fallback
-      result <- fallback.split("/", 2).toList match {
-        case host :: query :: _ =>
-          val c = DaemonConfiguration.proxy match {
-            case Some(proxy) => client.withTransport.httpProxyTo(s"${host}:443").withTls(host).newService(s"${proxy.host}:${proxy.port}")
-            case None => client.withTls(host).newService(s"${host}:443")
-          }
-          Some(FallbackParams(s"${host}:443", "/" + query), c)
-        case _ =>
-          None
-      }
-    } yield result
+    fallbackClientServices.get(currency)
   }
 
   private val paths: Map[String, String] = {

@@ -127,6 +127,7 @@ object Account extends Logging {
   def erc20Accounts(a: core.Account): Either[Exception, List[core.ERC20LikeAccount]] =
     asETHAccount(a).map(_.getERC20Accounts.asScala.toList)
 
+
   def erc20Balance(contract: String, a: core.Account)(implicit ec: ExecutionContext): Future[scala.BigInt] =
     for {
       account <- asERC20Account(contract, a).liftTo[Future]
@@ -354,7 +355,7 @@ object Account extends Logging {
       operations <- a.erc20Operations(contract_address)
     } yield operations.map(_._1).sortBy(_.getDate)
 
-    sorted_ops.map{ operations =>
+    sorted_ops.map { operations =>
       val ops = operations.filter(op => op.getDate.compareTo(start) >= 0 && op.getDate.compareTo(end) <= 0)
       filter(start, 1, end, standardTimePeriod(timePeriod), ops, Nil)
     }
