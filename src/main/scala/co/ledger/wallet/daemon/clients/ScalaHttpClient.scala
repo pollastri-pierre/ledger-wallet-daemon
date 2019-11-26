@@ -11,7 +11,6 @@ import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
 
 class ScalaHttpClient(implicit val ec: ExecutionContext) extends co.ledger.core.HttpClient with Logging {
 
@@ -61,7 +60,7 @@ class ScalaHttpClient(implicit val ec: ExecutionContext) extends co.ledger.core.
       override def getHeaders: util.HashMap[String, String] = headers
 
       override def readBody(): HttpReadBodyResult = {
-        Try {
+        try {
           val outputStream = new ByteOutputStream()
           var size = 0
           do {
@@ -72,15 +71,17 @@ class ScalaHttpClient(implicit val ec: ExecutionContext) extends co.ledger.core.
               outputStream.write(buffer)
             }
           } while (size > 0)
-          outputStream.getBytes
-        } match {
-          case Success(data) =>
-            if (isError) info(s"Received error ${new String(data)}")
-            new HttpReadBodyResult(null, data)
-          case Failure(ex) =>
-            ex.printStackTrace()
+          val data = outputStream.getBytes
+          if (isError) info(s"Received error ${new String(data)}")
+          new HttpReadBodyResult(null, data)
+        } catch {
+          case t: Throwable =>
+            t.printStackTrace()
             val error = new co.ledger.core.Error(ErrorCode.HTTP_ERROR, "An error happened during body reading.")
             new HttpReadBodyResult(error, null)
+        } finally {
+          response.close()
+          connection.disconnect()
         }
       }
     }

@@ -4,7 +4,7 @@ version := "0.0.0"
 
 organization := "co.ledger"
 
-scalaVersion := "2.12.8"
+scalaVersion := "2.12.10"
 
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
 
