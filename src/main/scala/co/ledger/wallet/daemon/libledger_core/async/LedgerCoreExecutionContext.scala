@@ -1,11 +1,10 @@
 package co.ledger.wallet.daemon.libledger_core.async
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{Executors, LinkedBlockingQueue, ThreadFactory, ThreadPoolExecutor, TimeUnit}
+import java.util.concurrent.{LinkedBlockingQueue, ThreadFactory, ThreadPoolExecutor, TimeUnit}
 import java.util.{Timer, TimerTask}
 
 import co.ledger.core
-import co.ledger.wallet.daemon.async.SerialExecutionContextWrapper
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -37,13 +36,11 @@ object LedgerCoreExecutionContext {
     ))
 
   def newSerialQueue(prefix: String): LedgerCoreExecutionContext = apply(
-    new SerialExecutionContextWrapper(
       ExecutionContext.fromExecutorService(
         new ThreadPoolExecutor(0, 1, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable],
           new ThreadFactory {
             override def newThread(r: Runnable): Thread = new Thread(r, s"Serial-CorePool-$prefix")
           }
-        )
       )
     ))
 }
