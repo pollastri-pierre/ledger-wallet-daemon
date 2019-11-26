@@ -10,7 +10,7 @@ import co.ledger.wallet.daemon.models.AccountInfo
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models.coins.Coin.TransactionView
 import com.twitter.finagle.http.Request
-import com.twitter.finatra.http.internal.marshalling.MessageBodyManager
+import com.twitter.finatra.http.marshalling.MessageBodyManager
 import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.Future

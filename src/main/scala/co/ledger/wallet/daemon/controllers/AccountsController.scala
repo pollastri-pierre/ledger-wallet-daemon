@@ -64,24 +64,23 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       accountsService.nextExtendedAccountCreationInfo(request.account_index, request.walletInfo)
     }
 
+    get("/accounts/:account_index") { request: AccountRequest =>
+      info(s"GET account $request")
+      accountsService.account(request.accountInfo).map {
+        case Some(view) => ResponseSerializer.serializeOk(view, response)
+        case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
+      }.recover {
+        case _: WalletPoolNotFoundException => ResponseSerializer.serializeBadRequest(
+          Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
+          response)
+        case _: WalletNotFoundException => ResponseSerializer.serializeBadRequest(
+          Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
+          response)
+        case e: Throwable => ResponseSerializer.serializeInternalError(response, e)
+      }
+    }
     // End point queries for account view with specified pool, wallet name, and unique account index.
     prefix("/accounts/:account_index") {
-
-      get("") { request: AccountRequest =>
-        info(s"GET account $request")
-        accountsService.account(request.accountInfo).map {
-          case Some(view) => ResponseSerializer.serializeOk(view, response)
-          case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
-        }.recover {
-          case _: WalletPoolNotFoundException => ResponseSerializer.serializeBadRequest(
-            Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
-            response)
-          case _: WalletNotFoundException => ResponseSerializer.serializeBadRequest(
-            Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
-            response)
-          case e: Throwable => ResponseSerializer.serializeInternalError(response, e)
-        }
-      }
 
       // End point queries for fresh addresses with specified pool, wallet name and unique account index.
       get("/addresses/fresh") { request: AccountRequest =>

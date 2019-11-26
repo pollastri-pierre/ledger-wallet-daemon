@@ -22,7 +22,6 @@ import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
-
 import com.twitter.finagle.Service
 import com.twitter.finagle.http.{Method, Request, Response}
 import javax.inject.{Inject, Singleton}
@@ -32,7 +31,6 @@ import org.web3j.abi.{FunctionEncoder, TypeReference}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.parsing.json.JSON
 import scala.util.{Success, Try}
 
 @Singleton
@@ -118,10 +116,14 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
             OptionT.liftF(client(request).asScala())
           }
           result <- OptionT.liftF(Future.fromTry(Try {
-            JSON.parseFull(response.contentString).get.asInstanceOf[Map[String, Any]] match {
-              case fields: Map[String, Any] => BigInt(fields("result").asInstanceOf[String].replaceFirst("0x", ""), 16)
-              case _ => throw new Exception("Failed to parse fallback provider result")
-            }
+            import io.circe.parser.parse
+            val json = parse(response.contentString)
+            val balance = json.flatMap { j =>
+              j.hcursor.get[String]("result")
+            }.map(_.replaceFirst("0x", ""))
+                .map(BigInt(_, 16))
+
+            balance.getOrElse(throw new Exception("Failed to parse fallback provider result"))
           }))
         } yield result
         result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))

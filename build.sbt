@@ -79,7 +79,8 @@ lazy val versions = new {
   val andrebeat  = "0.4.0"
   val bitcoinj   = "0.14.4"
   val cats       = "1.5.0"
-  val finatra    = "2.12.0"
+  val circe      = "0.12.3"
+  val finatra    = "19.11.0"
   val guice      = "4.0"
   val junit      = "4.12"
   val junitI     = "0.11"
@@ -123,6 +124,9 @@ lazy val root = (project in file("."))
       "org.web3j"                     % "abi"                    % versions.web3j,
       "org.web3j"                     % "core"                   % versions.web3j,
       "com.google.guava"              % "guava"                  % versions.guava,
+      "io.circe"                     %% "circe-core"             % versions.circe,
+      "io.circe"                     %% "circe-generic"          % versions.circe,
+      "io.circe"                     %% "circe-parser"           % versions.circe,
 
       // Tests dependencies
       "org.specs2"                   %% "specs2-mock"            % versions.specs2     % "it",

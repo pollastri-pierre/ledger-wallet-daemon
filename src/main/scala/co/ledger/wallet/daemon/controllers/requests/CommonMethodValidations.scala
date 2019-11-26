@@ -27,7 +27,7 @@ object CommonMethodValidations {
   def validateTimePeriod(timeInterval: String): ValidationResult = {
     try {
       TimePeriod.valueOf(timeInterval)
-      ValidationResult.Valid
+      ValidationResult.Valid()
     } catch {
       case _: IllegalArgumentException =>
         ValidationResult.validate(false, s"Time interval must be one of ${TimePeriod.values().toList}")

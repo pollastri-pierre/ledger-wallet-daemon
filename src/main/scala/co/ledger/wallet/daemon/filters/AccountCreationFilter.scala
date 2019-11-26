@@ -4,7 +4,7 @@ import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountExtendedDer
 import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finagle.{Service, SimpleFilter}
 import com.twitter.finatra.http.exceptions.BadRequestException
-import com.twitter.finatra.http.internal.marshalling.MessageBodyManager
+import com.twitter.finatra.http.marshalling.MessageBodyManager
 import com.twitter.util.Future
 import javax.inject.Inject
 
