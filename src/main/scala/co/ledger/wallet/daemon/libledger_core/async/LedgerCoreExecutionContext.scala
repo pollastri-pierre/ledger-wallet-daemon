@@ -6,14 +6,11 @@ import java.util.{Timer, TimerTask}
 
 import co.ledger.core
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.ExecutionContext {
-  private implicit val context: ExecutionContext = ec
 
-  override def execute(runnable: core.Runnable): Unit = Future {
-    runnable.run()
-  }
+  override def execute(runnable: core.Runnable): Unit = ec.execute(() => runnable.run())
 
   override def delay(runnable: core.Runnable, millis: Long): Unit = {
     val timer = new Timer()
