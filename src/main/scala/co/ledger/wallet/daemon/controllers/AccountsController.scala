@@ -79,7 +79,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         case e: Throwable => ResponseSerializer.serializeInternalError(response, e)
       }
     }
-    
+
     // End point queries for account view with specified pool, wallet name, and unique account index.
     prefix("/accounts/:account_index") {
 
