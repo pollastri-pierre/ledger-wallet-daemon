@@ -25,13 +25,15 @@ class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.Ex
 object LedgerCoreExecutionContext {
   def apply(ec: ExecutionContext): LedgerCoreExecutionContext = new LedgerCoreExecutionContext(ec)
 
-  val operationPool: ExecutionContext =
-    ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(DaemonConfiguration.corePoolOpSize, new ThreadFactory {
-      val cnt: AtomicInteger = new AtomicInteger
-      override def newThread(r: Runnable): Thread = new Thread(r, s"CPU-CorePool-${cnt.incrementAndGet}")
-    }))
+  lazy private[this] val opPool: ExecutionContext =
+    ExecutionContext.fromExecutorService(
+      Executors.newFixedThreadPool(Runtime.getRuntime.availableProcessors() * DaemonConfiguration.corePoolOpSizeFactor, new ThreadFactory {
+        val cnt: AtomicInteger = new AtomicInteger
 
-  def getCPUPool(): LedgerCoreExecutionContext = apply(operationPool)
+        override def newThread(r: Runnable): Thread = new Thread(r, s"CPU-CorePool-${cnt.incrementAndGet}")
+      }))
+
+  def operationPool: LedgerCoreExecutionContext = apply(opPool)
 
   def newSerialQueue(prefix: String): LedgerCoreExecutionContext = apply(
     ExecutionContext.fromExecutorService(

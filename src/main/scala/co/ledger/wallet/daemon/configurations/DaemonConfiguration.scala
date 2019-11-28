@@ -101,9 +101,9 @@ object DaemonConfiguration {
     else { 1 }
 
   // The core pool operation size
-  val corePoolOpSize: Int =
-    if (config.hasPath("core.threads.ops")) { config.getInt("core.threads.ops") }
-    else { 100 }
+  val corePoolOpSizeFactor: Int =
+    if (config.hasPath("core.threads.ops.factor")) { config.getInt("core.threads.ops.factor") }
+    else { 4 }
 
   // The maximum size of pagination token cache
   val balanceCacheMaxSize: Long =

@@ -11,12 +11,12 @@ class ScalaThreadDispatcher(mainContext: ExecutionContext) extends ThreadDispatc
   // Keep track in order to keep a single pool instance
   private val _poolsSerial = new ConcurrentHashMap[String, co.ledger.core.ExecutionContext]()
 
-  override def getSerialExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
+  override def getSerialExecutionContext(name: String): co.ledger.core.ExecutionContext = {
     _poolsSerial.computeIfAbsent(name, name => LedgerCoreExecutionContext.newSerialQueue(name))
   }
 
-  override def getThreadPoolExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
-    LedgerCoreExecutionContext.getCPUPool()
+  override def getThreadPoolExecutionContext(name: String): co.ledger.core.ExecutionContext = {
+    LedgerCoreExecutionContext.operationPool
   }
 
   override def getMainExecutionContext: co.ledger.core.ExecutionContext = _mainContext
