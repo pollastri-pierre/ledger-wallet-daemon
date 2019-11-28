@@ -8,15 +8,15 @@ import scala.concurrent.ExecutionContext
 
 class ScalaThreadDispatcher(mainContext: ExecutionContext) extends ThreadDispatcher {
   private val _mainContext = LedgerCoreExecutionContext(mainContext)
+  // Keep track in order to keep a single pool instance
   private val _poolsSerial = new ConcurrentHashMap[String, co.ledger.core.ExecutionContext]()
-  private val _pools = new ConcurrentHashMap[String, co.ledger.core.ExecutionContext]()
 
   override def getSerialExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
     _poolsSerial.computeIfAbsent(name, name => LedgerCoreExecutionContext.newSerialQueue(name))
   }
 
   override def getThreadPoolExecutionContext(name: String): co.ledger.core.ExecutionContext = synchronized {
-    _pools.computeIfAbsent(name, name => LedgerCoreExecutionContext.newThreadPool(name))
+    LedgerCoreExecutionContext.getCPUPool()
   }
 
   override def getMainExecutionContext: co.ledger.core.ExecutionContext = _mainContext

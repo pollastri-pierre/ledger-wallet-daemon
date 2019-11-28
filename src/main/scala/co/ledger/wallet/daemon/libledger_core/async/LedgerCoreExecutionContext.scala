@@ -1,11 +1,12 @@
 package co.ledger.wallet.daemon.libledger_core.async
 
 import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{LinkedBlockingQueue, ThreadFactory, ThreadPoolExecutor, TimeUnit}
+import java.util.concurrent.{Executors, LinkedBlockingQueue, ThreadFactory, ThreadPoolExecutor, TimeUnit}
 import java.util.{Timer, TimerTask}
 
 import co.ledger.core
 
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import scala.concurrent.ExecutionContext
 
 class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.ExecutionContext {
@@ -24,20 +25,20 @@ class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.Ex
 object LedgerCoreExecutionContext {
   def apply(ec: ExecutionContext): LedgerCoreExecutionContext = new LedgerCoreExecutionContext(ec)
 
-  def newThreadPool(prefix: String): LedgerCoreExecutionContext = apply(ExecutionContext.fromExecutor(
-      new ThreadPoolExecutor(0, Runtime.getRuntime.availableProcessors() * 4, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable],
-        new ThreadFactory {
-          val counter: AtomicInteger = new AtomicInteger
-          override def newThread(r: Runnable): Thread = new Thread(r, s"CorePool-${counter.incrementAndGet}-$prefix")
-        })
-    ))
+  val operationPool: ExecutionContext =
+    ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(DaemonConfiguration.corePoolOpSize, new ThreadFactory {
+      val cnt: AtomicInteger = new AtomicInteger
+      override def newThread(r: Runnable): Thread = new Thread(r, s"CPU-CorePool-${cnt.incrementAndGet}")
+    }))
+
+  def getCPUPool(): LedgerCoreExecutionContext = apply(operationPool)
 
   def newSerialQueue(prefix: String): LedgerCoreExecutionContext = apply(
-      ExecutionContext.fromExecutorService(
-        new ThreadPoolExecutor(0, 1, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable],
-          new ThreadFactory {
-            override def newThread(r: Runnable): Thread = new Thread(r, s"Serial-CorePool-$prefix")
-          }
+    ExecutionContext.fromExecutorService(
+      new ThreadPoolExecutor(0, 1, 60L, TimeUnit.SECONDS, new LinkedBlockingQueue[Runnable],
+        new ThreadFactory {
+          override def newThread(r: Runnable): Thread = new Thread(r, s"Serial-CorePool-$prefix")
+        }
       )
     ))
 }
