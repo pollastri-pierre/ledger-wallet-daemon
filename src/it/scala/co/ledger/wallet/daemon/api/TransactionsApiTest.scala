@@ -3,7 +3,6 @@ package co.ledger.wallet.daemon.api
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 import org.junit.Test
-import org.scalatest.Tag
 
 @Test
 class TransactionsApiTest extends APIFeatureTest {
@@ -35,8 +34,8 @@ class TransactionsApiTest extends APIFeatureTest {
             m/44'/1'/0'/0/2,mg4cBTMdZvkEbJAoMXDHyGDdjsqfjHzxQ6,035988c9617250f3a6d6e0e8e072bcf8bcb7f6802ffa4131b600e5afcca8bf47b2,cVytSayWDBWifQ6sXWgTJcFA1UW89YRUmQS13FQ6WoGLY612yPyz
             m/44'/1'/0'/0/3,n2PFTg4FhNM1w6c1JEphsJwTEXGGmF5E6a,0315779ec3bf11fc6755323c8125e14e818508d96b27ffe9dff2b636ce01966260,cPVUBRNcjSJCSk1m5JLBz3uapTv4pZUmxyRJtT9sZtBjZoVvoVog
  */
-
-  test("TransactionsApi#Create and sign transaction", Tag("ignore")) {
+  // Ignored : TODO BACK-375
+  ignore("TransactionsApi#Create and sign transaction") {
     val poolName = "transactionsCreation4Test"
     createPool(poolName)
     val walletName = "btcwallet"
