@@ -223,12 +223,13 @@ object Account extends Logging {
   }
 
   private def createBTCTransaction(ti: BTCTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
+   val partial: Boolean = ti.partialTransac.getOrElse(false)
     for {
       feesPerByte <- ti.feeAmount match {
         case Some(amount) => Future.successful(c.convertAmount(amount))
         case None => ClientFactory.apiClient.getFees(c.getName).map(f => c.convertAmount(f.getAmount(ti.feeMethod.get)))
       }
-      tx <- a.asBitcoinLikeAccount().buildTransaction(false)
+      tx <- a.asBitcoinLikeAccount().buildTransaction(partial)
         .sendToAddress(c.convertAmount(ti.amount), ti.recipient)
         .pickInputs(BitcoinLikePickingStrategy.OPTIMIZE_SIZE, UnsignedInteger.MAX_VALUE.intValue())
         .setFeesPerByte(feesPerByte)

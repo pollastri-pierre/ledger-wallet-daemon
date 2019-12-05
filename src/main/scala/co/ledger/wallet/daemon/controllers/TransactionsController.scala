@@ -54,8 +54,7 @@ object TransactionsController {
                                 @RouteParam wallet_name: String,
                                 @RouteParam account_index: Int,
                                 request: Request
-                               ) extends RequestWithUser
-  {
+                               ) extends RequestWithUser {
     def accountInfo: AccountInfo = AccountInfo(account_index, wallet_name, pool_name, user.pubKey)
   }
 
@@ -66,6 +65,7 @@ object TransactionsController {
                                             request: Request
                                            ) extends BroadcastTransactionRequest {
     def hexTx: Array[Byte] = HexUtils.valueOf(raw_transaction)
+
     def hexSig: Array[Byte] = HexUtils.valueOf(signatures.head)
 
     @MethodValidation
@@ -81,6 +81,7 @@ object TransactionsController {
                                             request: Request
                                            ) extends BroadcastTransactionRequest {
     def rawTx: Array[Byte] = HexUtils.valueOf(raw_transaction)
+
     def pairedSignatures: Seq[(Array[Byte], Array[Byte])] = signatures.zipWithIndex.map { case (sig, index) =>
       (HexUtils.valueOf(sig), HexUtils.valueOf(pubkeys(index)))
     }
@@ -100,6 +101,7 @@ object TransactionsController {
                                             request: Request
                                            ) extends BroadcastTransactionRequest {
     def hexTx: Array[Byte] = HexUtils.valueOf(raw_transaction)
+
     def hexSig: Array[Byte] = HexUtils.valueOf(signatures.head)
 
     @MethodValidation
@@ -116,7 +118,9 @@ object TransactionsController {
                                          contract: Option[String]
                                         ) extends CreateTransactionRequest {
     def amountValue: BigInt = BigInt(amount)
+
     def gasLimitValue: Option[BigInt] = gas_limit.map(BigInt(_))
+
     def gasPriceValue: Option[BigInt] = gas_price.map(BigInt(_))
 
     override def transactionInfo: TransactionInfo = ETHTransactionInfo(recipient, amountValue, gasLimitValue, gasPriceValue, contract)
@@ -126,12 +130,14 @@ object TransactionsController {
                                          fees_per_byte: Option[String],
                                          fees_level: Option[String],
                                          amount: String,
-                                         exclude_utxos: Option[Map[String, Int]]
+                                         exclude_utxos: Option[Map[String, Int]],
+                                         partialTransac: Option[Boolean]
                                         ) extends CreateTransactionRequest {
     def amountValue: BigInt = BigInt(amount)
+
     def feesPerByteValue: Option[BigInt] = fees_per_byte.map(BigInt(_))
 
-    def transactionInfo: BTCTransactionInfo = BTCTransactionInfo(recipient, feesPerByteValue, fees_level, amountValue, exclude_utxos.getOrElse(Map[String, Int]()))
+    def transactionInfo: BTCTransactionInfo = BTCTransactionInfo(recipient, feesPerByteValue, fees_level, amountValue, exclude_utxos.getOrElse(Map[String, Int]()), partialTransac)
 
     @MethodValidation
     def validateFees: ValidationResult = CommonMethodValidations.validateFees(feesPerByteValue, fees_level)
@@ -142,24 +148,26 @@ object TransactionsController {
   case class XRPSendToRequest(amount: String, address: String)
 
   case class CreateXRPTransactionRequest(send_to: List[XRPSendToRequest], // Send funds to the given address.
-                                         wipe_to: Option[String],         // Send all available funds to the given address.
-                                         fees: Option[String],            // Fees (in drop) the originator is willing to pay
-                                         memos: List[RippleLikeMemo],     // Memos to add for this transaction
-                                         destination_tag: Option[Long]    // An arbitrary unsigned 32-bit integer that identifies a reason for payment or a non-Ripple account
+                                         wipe_to: Option[String], // Send all available funds to the given address.
+                                         fees: Option[String], // Fees (in drop) the originator is willing to pay
+                                         memos: List[RippleLikeMemo], // Memos to add for this transaction
+                                         destination_tag: Option[Long] // An arbitrary unsigned 32-bit integer that identifies a reason for payment or a non-Ripple account
                                         ) extends CreateTransactionRequest {
     def sendToValue: List[XRPSendTo] = send_to.map { r => XRPSendTo(BigInt(r.amount), r.address) }
+
     def feesValue: Option[BigInt] = fees.map(BigInt(_))
 
     override def transactionInfo: TransactionInfo = XRPTransactionInfo(sendToValue, wipe_to, feesValue: Option[BigInt], memos, destination_tag)
   }
 
-  trait TransactionInfo
+  trait  TransactionInfo
 
-  case class BTCTransactionInfo(recipient: String, feeAmount: Option[BigInt], feeLevel: Option[String], amount: BigInt, excludeUtxos: Map[String, Int]) extends TransactionInfo {
+  case class BTCTransactionInfo(recipient: String, feeAmount: Option[BigInt], feeLevel: Option[String], amount: BigInt, excludeUtxos: Map[String, Int], partialTransac: Option[Boolean]) extends TransactionInfo {
     lazy val feeMethod: Option[FeeMethod] = feeLevel.map { level => FeeMethod.from(level) }
   }
 
   case class ETHTransactionInfo(recipient: String, amount: BigInt, gasLimit: Option[BigInt], gasPrice: Option[BigInt], contract: Option[String]) extends TransactionInfo
 
   case class XRPTransactionInfo(sendTo: List[XRPSendTo], wipeTo: Option[String], fees: Option[BigInt], memos: List[RippleLikeMemo], destinationTag: Option[Long]) extends TransactionInfo
+
 }
