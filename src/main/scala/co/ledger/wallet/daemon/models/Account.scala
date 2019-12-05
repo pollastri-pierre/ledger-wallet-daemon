@@ -223,7 +223,7 @@ object Account extends Logging {
   }
 
   private def createBTCTransaction(ti: BTCTransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
-   val partial: Boolean = ti.partialTransac.getOrElse(false)
+    val partial: Boolean = ti.partialTx.getOrElse(false)
     for {
       feesPerByte <- ti.feeAmount match {
         case Some(amount) => Future.successful(c.convertAmount(amount))

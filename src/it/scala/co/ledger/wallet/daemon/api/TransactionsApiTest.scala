@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.api
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 import com.twitter.finagle.http.{Response, Status}
 import org.junit.Test
+import org.scalatest.Tag
 
 @Test
 class TransactionsApiTest extends APIFeatureTest {
@@ -19,7 +20,23 @@ class TransactionsApiTest extends APIFeatureTest {
     super.afterAll()
   }
 
-  test("TransactionsApi#Create and sign transaction") {
+  /*
+      Bitcoin testnet account
+      BIP39 mnemonic : amount picture reward sorry local traffic response subject arrow tape silver stereo young path laugh leisure pitch lend drill elephant rural mushroom pill dice
+      BIP39 Seed : 8300c413fe76b06c7a6420143348410c494e98e22ed6ed894b399d6e19712d0beaf7674742ead88fda64d70a21da0618d8899c8caea77cc2a718a16c9f1b1b38
+      Account extended pubKey :             tpubDCvkaY3GEKQxpSpKaKNg4PNUzR42yr2XoKWWEMXaSE5gCouqUazcDpWXTGkFAkdGruCQtdTxHqHt8dbbTVfBCxvvwJHeMU4YPzWVLdoAL5H
+      Account extended private key :        tprv8gEiS8125wjHvynXgfi5eyiNRPY6pWqdE1uiwqVH1xHHNKf4rCB23KtfH9fbLW8azudGrvwQag5Jwg85qttNpfXdu9aBHssrZMZC5MtwujQ
+      BIP32 Account extended pubKey :       tpubDFZ7AWJ9LgCoS6NAhmY7BRcBg9TWnQEMUeLugE8XssxnTj32KdsMh6W7GfyB7QsXjhuPETS6FRWzQBMR9Xe3uNbtMeXBLVjSoUHSEka9VZJ
+      BIP32 Account extended private key :  tprv8is526FuCJX8YdLNp7sWn1x577wad53SuLk8Pi6ETcAPdEnFhF3mWbtF6YrzUpx8spPw3tgpPdW3u34qM6oXuqXdiNGLaaNpG1iJxJg9RMw
+      Derivations :
+                path,                 address,                                            public key,                                                   private key
+            m/44'/1'/0'/0/0,n1QJpnrS6fTjdT3q3bc8twB9t6AA6L9RXm,0276b49de71f3032ba98f2988ae0a00b8c10011183007f2701aff60de1b272e45d,cPHCq2vd5C3W1UXqRS9HpVHR9DYJguTjfwjk8weP4zHhZKAY3M3q
+            m/44'/1'/0'/0/1,mxZcpwZ7XBdfb4JcGLzdEP8WPQaGzeUeFU,030d222dcc39de637d1a6ff646d600f4e26aad5af3b6a0ab9f979d1d3fb5c01b91,cUyokwFBMPgjw2kT92cjF7bzqjyUtLe8pjdYgmRp4z2kHf8kAWXU
+            m/44'/1'/0'/0/2,mg4cBTMdZvkEbJAoMXDHyGDdjsqfjHzxQ6,035988c9617250f3a6d6e0e8e072bcf8bcb7f6802ffa4131b600e5afcca8bf47b2,cVytSayWDBWifQ6sXWgTJcFA1UW89YRUmQS13FQ6WoGLY612yPyz
+            m/44'/1'/0'/0/3,n2PFTg4FhNM1w6c1JEphsJwTEXGGmF5E6a,0315779ec3bf11fc6755323c8125e14e818508d96b27ffe9dff2b636ce01966260,cPVUBRNcjSJCSk1m5JLBz3uapTv4pZUmxyRJtT9sZtBjZoVvoVog
+ */
+
+  test("TransactionsApi#Create and sign transaction", Tag("ignore")) {
     val poolName = "transactionsCreation4Test"
     createPool(poolName)
     val walletName = "btcwallet"
@@ -112,20 +129,6 @@ class TransactionsApiTest extends APIFeatureTest {
     )
   }
 
-  /*
-BIP39 mnemonic : amount picture reward sorry local traffic response subject arrow tape silver stereo young path laugh leisure pitch lend drill elephant rural mushroom pill dice
-BIP39 Seed : 8300c413fe76b06c7a6420143348410c494e98e22ed6ed894b399d6e19712d0beaf7674742ead88fda64d70a21da0618d8899c8caea77cc2a718a16c9f1b1b38
-Account extended pubKey :             tpubDCvkaY3GEKQxpSpKaKNg4PNUzR42yr2XoKWWEMXaSE5gCouqUazcDpWXTGkFAkdGruCQtdTxHqHt8dbbTVfBCxvvwJHeMU4YPzWVLdoAL5H
-Account extended private key :        tprv8gEiS8125wjHvynXgfi5eyiNRPY6pWqdE1uiwqVH1xHHNKf4rCB23KtfH9fbLW8azudGrvwQag5Jwg85qttNpfXdu9aBHssrZMZC5MtwujQ
-BIP32 Account extended pubKey :       tpubDFZ7AWJ9LgCoS6NAhmY7BRcBg9TWnQEMUeLugE8XssxnTj32KdsMh6W7GfyB7QsXjhuPETS6FRWzQBMR9Xe3uNbtMeXBLVjSoUHSEka9VZJ
-BIP32 Account extended private key :  tprv8is526FuCJX8YdLNp7sWn1x577wad53SuLk8Pi6ETcAPdEnFhF3mWbtF6YrzUpx8spPw3tgpPdW3u34qM6oXuqXdiNGLaaNpG1iJxJg9RMw
-Derivations :
-          path,                 address,                                            public key,                                                   private key
-      m/44'/1'/0'/0/0,n1QJpnrS6fTjdT3q3bc8twB9t6AA6L9RXm,0276b49de71f3032ba98f2988ae0a00b8c10011183007f2701aff60de1b272e45d,cPHCq2vd5C3W1UXqRS9HpVHR9DYJguTjfwjk8weP4zHhZKAY3M3q
-      m/44'/1'/0'/0/1,mxZcpwZ7XBdfb4JcGLzdEP8WPQaGzeUeFU,030d222dcc39de637d1a6ff646d600f4e26aad5af3b6a0ab9f979d1d3fb5c01b91,cUyokwFBMPgjw2kT92cjF7bzqjyUtLe8pjdYgmRp4z2kHf8kAWXU
-      m/44'/1'/0'/0/2,mg4cBTMdZvkEbJAoMXDHyGDdjsqfjHzxQ6,035988c9617250f3a6d6e0e8e072bcf8bcb7f6802ffa4131b600e5afcca8bf47b2,cVytSayWDBWifQ6sXWgTJcFA1UW89YRUmQS13FQ6WoGLY612yPyz
-      m/44'/1'/0'/0/3,n2PFTg4FhNM1w6c1JEphsJwTEXGGmF5E6a,0315779ec3bf11fc6755323c8125e14e818508d96b27ffe9dff2b636ce01966260,cPVUBRNcjSJCSk1m5JLBz3uapTv4pZUmxyRJtT9sZtBjZoVvoVog
- */
   private val ACCOUNT_BODY =
     """{""" +
       """"account_index": 0,""" +

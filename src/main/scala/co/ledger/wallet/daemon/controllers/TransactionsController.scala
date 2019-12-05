@@ -24,6 +24,7 @@ class TransactionsController @Inject()(transactionsService: TransactionsService)
     * fees_level: optional(SLOW, FAST, NORMAL),
     * amount: in satoshi,
     * exclude_utxos: map{txHash: index}
+    * partial_tx : optional(boolean) - lightweight mode can be used in order to calculate fees, partial mode avoid costly calls to retrieve unnecessary UTXOs info
     * }
     *
     */
@@ -131,13 +132,13 @@ object TransactionsController {
                                          fees_level: Option[String],
                                          amount: String,
                                          exclude_utxos: Option[Map[String, Int]],
-                                         partialTransac: Option[Boolean]
+                                         partialTx: Option[Boolean],
                                         ) extends CreateTransactionRequest {
     def amountValue: BigInt = BigInt(amount)
 
     def feesPerByteValue: Option[BigInt] = fees_per_byte.map(BigInt(_))
 
-    def transactionInfo: BTCTransactionInfo = BTCTransactionInfo(recipient, feesPerByteValue, fees_level, amountValue, exclude_utxos.getOrElse(Map[String, Int]()), partialTransac)
+    def transactionInfo: BTCTransactionInfo = BTCTransactionInfo(recipient, feesPerByteValue, fees_level, amountValue, exclude_utxos.getOrElse(Map[String, Int]()), partialTx)
 
     @MethodValidation
     def validateFees: ValidationResult = CommonMethodValidations.validateFees(feesPerByteValue, fees_level)
@@ -162,7 +163,12 @@ object TransactionsController {
 
   trait  TransactionInfo
 
-  case class BTCTransactionInfo(recipient: String, feeAmount: Option[BigInt], feeLevel: Option[String], amount: BigInt, excludeUtxos: Map[String, Int], partialTransac: Option[Boolean]) extends TransactionInfo {
+  case class BTCTransactionInfo(recipient: String,
+                                feeAmount: Option[BigInt],
+                                feeLevel: Option[String],
+                                amount: BigInt,
+                                excludeUtxos: Map[String, Int],
+                                partialTx: Option[Boolean]) extends TransactionInfo {
     lazy val feeMethod: Option[FeeMethod] = feeLevel.map { level => FeeMethod.from(level) }
   }
 
