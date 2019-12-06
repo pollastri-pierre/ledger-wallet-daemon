@@ -121,7 +121,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
             val balance = json.flatMap { j =>
               j.hcursor.get[String]("result")
             }.map(_.replaceFirst("0x", ""))
-                .map(BigInt(_, 16))
+              .map(BigInt(_, 16))
 
             balance.getOrElse(throw new Exception("Failed to parse fallback provider result"))
           }))
@@ -188,7 +188,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.withAccount(accountInfo) { account =>
       for {
         erc20Accounts <- account.erc20Accounts.liftTo[Future]
-        views <- erc20Accounts.map(ERC20AccountView.fromERC20Account).sequence
+        erc20Balances <- account.erc20Balances(Some(erc20Accounts.map(acc => acc.getToken.getContractAddress).toArray))
+        views <- erc20Accounts.zip(erc20Balances).map(v => ERC20AccountView.fromERC20Account(v._1, v._2)).sequence
       } yield views
     }
 
@@ -196,7 +197,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.withAccount(tokenAccountInfo.accountInfo) { account =>
       for {
         erc20Account <- account.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future]
-        view <- ERC20AccountView.fromERC20Account(erc20Account)
+        balance <- account.erc20Balances(Some(Array[String](tokenAccountInfo.tokenAddress)))
+        view <- ERC20AccountView.fromERC20Account(erc20Account, balance.head)
       } yield view
     }
 
