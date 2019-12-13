@@ -36,7 +36,7 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     info(s"GET wallet pool $request")
     poolsService.pool(request.poolInfo).map {
       case Some(view) => ResponseSerializer.serializeOk(view, response)
-      case None => ResponseSerializer.serializeNotFound(
+      case None => ResponseSerializer.serializeNotFound(request.request,
         Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name), response)
     }
   }

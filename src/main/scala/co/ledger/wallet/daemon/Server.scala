@@ -44,7 +44,7 @@ class ServerImpl extends HttpServer {
   override protected def configureHttpServer(server: Http.Server): Http.Server = {
     server
       .withSession.maxIdleTime(Duration.fromSeconds(10))
-      .withSession.maxLifeTime(Duration.fromSeconds(300))
+      .withSession.maxLifeTime(Duration.fromMinutes(10))
   }
 
   override protected def warmup(): Unit = {

@@ -34,7 +34,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
     info(s"GET wallet $request")
     walletsService.wallet(request.walletInfo).map {
       case Some(view) => ResponseSerializer.serializeOk(view, response)
-      case None => ResponseSerializer.serializeNotFound(
+      case None => ResponseSerializer.serializeNotFound(request.request,
         Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
     }
   }
