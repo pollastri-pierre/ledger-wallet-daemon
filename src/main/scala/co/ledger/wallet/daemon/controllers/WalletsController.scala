@@ -33,7 +33,7 @@ class WalletsController @Inject()(walletsService: WalletsService) extends Contro
   filter[DeprecatedRouteFilter].get("/pools/:pool_name/wallets/:wallet_name") { request: GetWalletRequest =>
     info(s"GET wallet $request")
     walletsService.wallet(request.walletInfo).map {
-      case Some(view) => ResponseSerializer.serializeOk(view, response)
+      case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
       case None => ResponseSerializer.serializeNotFound(request.request,
         Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name), response)
     }

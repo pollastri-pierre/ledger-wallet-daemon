@@ -67,7 +67,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     filter[DeprecatedRouteFilter].get("/accounts/:account_index") { request: AccountRequest =>
       info(s"GET account $request")
       accountsService.account(request.accountInfo).map {
-        case Some(view) => ResponseSerializer.serializeOk(view, response)
+        case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
         case None => ResponseSerializer.serializeNotFound(request.request, Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
       }.recover {
         case _: WalletPoolNotFoundException => ResponseSerializer.serializeBadRequest(request.request,
@@ -124,12 +124,12 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         request.uid match {
           case "first" => accountsService.firstOperation(request.accountInfo)
             .map {
-              case Some(view) => ResponseSerializer.serializeOk(view, response)
+              case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
               case None => ResponseSerializer.serializeNotFound(request.request, Map("response" -> "Account is empty"), response)
             }
           case _ => accountsService.accountOperation(request.uid, request.full_op, request.accountInfo)
             .map {
-              case Some(view) => ResponseSerializer.serializeOk(view, response)
+              case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
               case None => ResponseSerializer.serializeNotFound(request.request, Map("response" -> "Account operation doesn't exist", "uid" -> request.uid), response)
             }
         }

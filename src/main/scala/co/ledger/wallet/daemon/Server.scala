@@ -40,7 +40,7 @@ class ServerImpl extends HttpServer {
       .exceptionMapper[AuthenticationExceptionMapper]
       .exceptionMapper[DaemonExceptionMapper]
       .exceptionMapper[LibCoreExceptionMapper]
-  
+
   override protected def configureHttpServer(server: Http.Server): Http.Server = {
     server
       .withSession.maxIdleTime(Duration.fromSeconds(10))

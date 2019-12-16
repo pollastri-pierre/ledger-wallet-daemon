@@ -10,33 +10,35 @@ object ResponseSerializer extends Logging {
     val msg = Map(
       "response"->s"Internal server error occurred while processing the request. ${caught.getMessage}"
     )
-    log((str: String) => error(str, caught), ErrorCode.Internal_Error, request, msg)
-    response.internalServerError
-      .body(ErrorResponseBody(ErrorCode.Internal_Error, msg))
+    log(error(_, caught), ErrorCode.Internal_Error, request, msg)
+    response.internalServerError.body(ErrorResponseBody(ErrorCode.Internal_Error, msg))
   }
 
   def serializeBadRequest(request: Request, msg: Map[String, Any], response: ResponseBuilder): Response = {
-    log((str) => info(str), ErrorCode.Bad_Request, request, msg)
+    log(info(_), ErrorCode.Bad_Request, request, msg)
     response.badRequest
       .body(ErrorResponseBody(ErrorCode.Bad_Request, msg))
   }
 
   def serializeNotFound(request: Request, msg: Map[String, Any], response: ResponseBuilder): Response = {
-    log((str) => info(str), ErrorCode.Not_Found, request, msg)
+    log(info(_), ErrorCode.Not_Found, request, msg)
     response.notFound
       .body(ErrorResponseBody(ErrorCode.Not_Found, msg))
   }
 
-  private[this] def log(logLevel: String => Unit,
+  private[this] def log(msgLogger: String => Unit,
                         error: ErrorCode,
                         request: Request,
                         msg: Map[String, Any]): Unit = {
-    logLevel(s"$error - [${request.method.name}] ${request.path} - Message : $msg")
+    msgLogger(s"$error - [${request.method.name}] ${request.path} - Message : $msg")
   }
 
-  def serializeOk(obj: Any, response: ResponseBuilder): Response = {
-    info("Ok")
-    response.ok(obj)
+  def serializeOk(obj: Any, request: Request, response: ResponseBuilder): Response = {
+    val resp = response.ok(obj)
+    if( logger.isDebugEnabled ) {
+      debug(s"OK - [${request.method.name}] ${request.path} - Response : $resp")
+    }
+    resp
   }
 }
 
