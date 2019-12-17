@@ -25,8 +25,8 @@ class CurrenciesController @Inject()(currenciesService: CurrenciesService) exten
     val currencyName = request.currency_name
     info(s"GET currency $request")
     currenciesService.currency(currencyName, request.poolInfo).map {
-      case Some(currency) => ResponseSerializer.serializeOk(currency, response)
-      case None => ResponseSerializer.serializeNotFound(
+      case Some(currency) => ResponseSerializer.serializeOk(currency, request.request, response)
+      case None => ResponseSerializer.serializeNotFound(request.request,
         Map("response" -> "Currency not support", "currency_name" -> currencyName), response)
     }
   }

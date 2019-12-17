@@ -67,16 +67,16 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     filter[DeprecatedRouteFilter].get("/accounts/:account_index") { request: AccountRequest =>
       info(s"GET account $request")
       accountsService.account(request.accountInfo).map {
-        case Some(view) => ResponseSerializer.serializeOk(view, response)
-        case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
+        case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
+        case None => ResponseSerializer.serializeNotFound(request.request, Map("response" -> "Account doesn't exist", "account_index" -> request.account_index), response)
       }.recover {
-        case _: WalletPoolNotFoundException => ResponseSerializer.serializeBadRequest(
+        case _: WalletPoolNotFoundException => ResponseSerializer.serializeBadRequest(request.request,
           Map("response" -> "Wallet pool doesn't exist", "pool_name" -> request.pool_name),
           response)
-        case _: WalletNotFoundException => ResponseSerializer.serializeBadRequest(
+        case _: WalletNotFoundException => ResponseSerializer.serializeBadRequest(request.request,
           Map("response" -> "Wallet doesn't exist", "wallet_name" -> request.wallet_name),
           response)
-        case e: Throwable => ResponseSerializer.serializeInternalError(response, e)
+        case e: Throwable => ResponseSerializer.serializeInternalError(request.request, response, e)
       }
     }
 
@@ -124,13 +124,13 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         request.uid match {
           case "first" => accountsService.firstOperation(request.accountInfo)
             .map {
-              case Some(view) => ResponseSerializer.serializeOk(view, response)
-              case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account is empty"), response)
+              case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
+              case None => ResponseSerializer.serializeNotFound(request.request, Map("response" -> "Account is empty"), response)
             }
           case _ => accountsService.accountOperation(request.uid, request.full_op, request.accountInfo)
             .map {
-              case Some(view) => ResponseSerializer.serializeOk(view, response)
-              case None => ResponseSerializer.serializeNotFound(Map("response" -> "Account operation doesn't exist", "uid" -> request.uid), response)
+              case Some(view) => ResponseSerializer.serializeOk(view, request.request, response)
+              case None => ResponseSerializer.serializeNotFound(request.request, Map("response" -> "Account operation doesn't exist", "uid" -> request.uid), response)
             }
         }
       }
