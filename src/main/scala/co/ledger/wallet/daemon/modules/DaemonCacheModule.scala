@@ -34,7 +34,7 @@ object DaemonCacheModule extends TwitterModule {
 
     def synchronizationTask(): Unit = {
       try {
-        Await.result(poolsService.syncOperations, 30.minutes).foreach{
+        Await.result(poolsService.syncOperations, 1.hour).foreach{
           case Success(r) =>
             if (r.syncResult) {
               info(s"Synchronization complete for $r")
