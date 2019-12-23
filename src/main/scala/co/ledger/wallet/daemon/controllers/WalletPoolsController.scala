@@ -3,7 +3,9 @@ package co.ledger.wallet.daemon.controllers
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.controllers.requests.{CommonMethodValidations, RequestWithUser, WithPoolInfo}
 import co.ledger.wallet.daemon.controllers.responses.ResponseSerializer
+import co.ledger.wallet.daemon.exceptions.AccountSyncException
 import co.ledger.wallet.daemon.filters.DeprecatedRouteFilter
+import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.AuthenticationService.AuthentifiedUserContext._
 import co.ledger.wallet.daemon.services.PoolsService
 import co.ledger.wallet.daemon.services.PoolsService.PoolConfiguration
@@ -13,6 +15,8 @@ import com.twitter.finatra.http.Controller
 import com.twitter.finatra.request.RouteParam
 import com.twitter.finatra.validation.{MethodValidation, NotEmpty, ValidationResult}
 import javax.inject.Inject
+
+import scala.util.{Failure, Success}
 
 class WalletPoolsController @Inject()(poolsService: PoolsService) extends Controller {
 
@@ -51,7 +55,11 @@ class WalletPoolsController @Inject()(poolsService: PoolsService) extends Contro
     poolsService.syncOperations.map { result =>
       val t1 = System.currentTimeMillis()
       info(s"Synchronization finished, elapsed time: ${t1 - t0} milliseconds")
-      result
+      result.collect{
+        case Success(value) => value
+        case Failure(t: AccountSyncException) =>
+          SynchronizationResult(t.accountIndex, t.walletName, t.poolName, syncResult = false)
+      }
     }
   }
   }
