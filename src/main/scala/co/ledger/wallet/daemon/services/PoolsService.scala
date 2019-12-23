@@ -5,7 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
-import co.ledger.wallet.daemon.exceptions.AccountSyncException
+import co.ledger.wallet.daemon.exceptions.{AccountSyncException, SyncOnGoingException}
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models.{PoolInfo, WalletPoolView}
@@ -52,7 +52,7 @@ class PoolsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
     */
   def syncOperations: Future[Seq[Try[SynchronizationResult]]] = {
     if (syncOnGoing.get()) {
-      Future.failed(new Exception("Synchronization is on going"))
+      Future.failed(SyncOnGoingException())
     } else {
       syncOnGoing.set(true)
       val accountsFuture = for {

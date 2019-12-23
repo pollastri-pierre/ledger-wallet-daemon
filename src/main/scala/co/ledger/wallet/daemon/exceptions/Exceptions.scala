@@ -82,12 +82,17 @@ case class AccountSyncException(poolName: String, walletName: String, accountInd
   val code = ErrorCodes.ACCOUNT_SYNC_FAILED
 } with DaemonException(msg, t)
 
+case class SyncOnGoingException() extends {
+  val msg = "Synchronization is on going ..."
+  val code = ErrorCodes.SYNC_ON_GOING
+} with DaemonException(msg)
+
 case class SignatureSizeUnmatchException(txSize: Int, signatureSize: Int) extends {
   val code = ErrorCodes.SIGNATURE_SIZE_UNMATCH
   val msg = "Signatures and transaction inputs size not matching"
 } with DaemonException(msg)
 
-abstract class DaemonException(msg: String, t: Throwable = null) extends Exception(msg, t) {
+sealed abstract class DaemonException(msg: String, t: Throwable = null) extends Exception(msg, t) {
   def code: Int
   def msg: String
 }
@@ -107,6 +112,7 @@ object ErrorCodes {
   val CURRENCY_NOT_SUPPORTED = 209
   val INVALID_CURRENCY_FOR_ERC20 = 210
   val ACCOUNT_SYNC_FAILED = 211
+  val SYNC_ON_GOING = 212
   val CORE_BAD_REQUEST = 301
   val DAEMON_DATABASE_EXCEPTION = 302
 }

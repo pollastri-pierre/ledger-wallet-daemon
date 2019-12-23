@@ -75,6 +75,31 @@ class DaemonExceptionMapper @Inject()(response: ResponseBuilder)
           daemonExceptionInfo(e) + ("contract" -> e.tokenAddress),
           response
         )
+      case e: AccountSyncException =>
+        ResponseSerializer.serializeBadRequest(request,
+          daemonExceptionInfo(e),
+          response
+        )
+      case e: DaemonDatabaseException =>
+        ResponseSerializer.serializeBadRequest(request,
+          daemonExceptionInfo(e),
+          response
+        )
+      case e: InvalidCurrencyForErc20Operation =>
+        ResponseSerializer.serializeBadRequest(request,
+          daemonExceptionInfo(e),
+          response
+        )
+      case e: InvalidEIP55Format =>
+        ResponseSerializer.serializeBadRequest(request,
+          daemonExceptionInfo(e),
+          response
+        )
+      case e: SyncOnGoingException =>
+        ResponseSerializer.serializeBadRequest(request,
+          daemonExceptionInfo(e),
+          response
+        )
     }
   }
 }
