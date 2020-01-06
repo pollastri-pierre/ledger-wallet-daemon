@@ -20,9 +20,6 @@ jobs:
         environment:
           JVM_OPTS: -Xmx3200m
           TERM: dumb
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
     steps:
       - checkout
       - restore_cache: *dependencies_cache
@@ -45,9 +42,6 @@ jobs:
   scala_linter:
     docker:
       - image: ledgerhq/sbt-openjdk-8
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
     steps:
       - checkout
       - run:
@@ -60,9 +54,6 @@ jobs:
         environment:
           JVM_OPTS: -Xmx3200m
           TERM: dumb
-        auth:
-          username: $DOCKER_USERNAME
-          password: $DOCKER_PASSWORD
     steps:
       - checkout
       - restore_cache: *dependencies_cache
@@ -85,7 +76,6 @@ workflows:
       - docker/build_image:
           requires:
             - compile
-          docker_login: true
           after_checkout:
             - attach_workspace:
                 at: /home/circleci/project
