@@ -2,7 +2,7 @@ package co.ledger.wallet.daemon.controllers
 
 import java.util.{Date, UUID}
 
-import co.ledger.core.{OperationType, TimePeriod}
+import co.ledger.core.TimePeriod
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.controllers.requests.CommonMethodValidations.DATE_FORMATTER
 import co.ledger.wallet.daemon.controllers.requests._
@@ -142,8 +142,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
           accountOpt <- accountsService.getAccount(request.accountInfo)
           account <- accountOpt.map(Future.successful).getOrElse(Future.failed(AccountNotFoundException(request.account_index)))
           balances <- account.balances(request.start, request.end, request.timePeriod)
-          operationCounts <- account.operationsCounts(request.startDate, request.endDate, request.timePeriod)
-        } yield HistoryResponse(balances, operationCounts)
+        } yield HistoryResponse(balances)
       }
 
       // Synchronize a single account
@@ -170,10 +169,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       get("/tokens/:token_address/history") { request: TokenHistoryRequest =>
         for {
           balances <- accountsService.getTokenCoreAccountBalanceHistory(request.tokenAccountInfo, request.startDate, request.endDate, request.timePeriod)
-          accountOpt <- accountsService.getAccount(request.tokenAccountInfo.accountInfo)
-          account <- accountOpt.map(Future.successful).getOrElse(Future.failed(AccountNotFoundException(request.account_index)))
-          operationCounts <- account.ERC20operationsCounts(request.startDate, request.endDate, request.timePeriod, request.tokenAccountInfo.tokenAddress)
-        } yield TokenHistoryResponse(balances, operationCounts)
+        } yield TokenHistoryResponse(balances)
       }
 
       // given token address, get the operations on this token
@@ -209,9 +205,9 @@ object AccountsController {
     def validateAccountIndex: ValidationResult = ValidationResult.validate(account_index >= 0, "account_index: index can not be less than zero")
   }
 
-  case class HistoryResponse(balances: List[BigInt], operationCounts: List[Map[OperationType, Int]])
+  case class HistoryResponse(balances: List[BigInt])
 
-  case class TokenHistoryResponse(balances: List[BigInt], operationCounts: List[Map[OperationType, Int]])
+  case class TokenHistoryResponse(balances: List[BigInt])
 
   case class HistoryRequest(
                              @RouteParam override val pool_name: String,

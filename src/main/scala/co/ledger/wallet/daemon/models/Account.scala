@@ -91,12 +91,6 @@ object Account extends Logging {
     def operations(offset: Long, batch: Int, fullOp: Int)(implicit ec: ExecutionContext): Future[Seq[core.Operation]] =
       Account.operations(offset, batch, fullOp, a.queryOperations())
 
-    def operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] =
-      Account.operationsCounts(start, end, timePeriod, a)
-
-    def ERC20operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, contract_address: String)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] =
-      Account.ERC20operationsCounts(start, end, timePeriod, a, contract_address)
-
     def freshAddresses(implicit ec: ExecutionContext): Future[Seq[core.Address]] =
       Account.freshAddresses(a)
 
@@ -347,26 +341,6 @@ object Account extends Logging {
     }
   }
 
-  // TODO: refactor this part once lib-core provides the feature
-  def operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, a: core.Account)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] = {
-    a.queryOperations().addOrder(OperationOrderKey.DATE, true).partial().execute().map { operations =>
-      val ops = operations.asScala.toList.filter(op => op.getDate.compareTo(start) >= 0 && op.getDate.compareTo(end) <= 0)
-      filter(start, 1, end, standardTimePeriod(timePeriod), ops, Nil)
-    }
-  }
-
-  // TODO: refactor this part once lib-core provides the feature
-  def ERC20operationsCounts(start: Date, end: Date, timePeriod: core.TimePeriod, a: core.Account, contract_address: String)(implicit ec: ExecutionContext): Future[List[Map[core.OperationType, Int]]] = {
-    val sorted_ops = for {
-      operations <- a.erc20Operations(contract_address)
-    } yield operations.map(_._1).sortBy(_.getDate)
-
-    sorted_ops.map { operations =>
-      val ops = operations.filter(op => op.getDate.compareTo(start) >= 0 && op.getDate.compareTo(end) <= 0)
-      filter(start, 1, end, standardTimePeriod(timePeriod), ops, Nil)
-    }
-  }
-
   @tailrec
   private def filter(start: Date, i: Int, end: Date, timePeriod: Int, operations: List[core.Operation], preResult: List[Map[core.OperationType, Int]]): List[Map[core.OperationType, Int]] = {
     def searchResult(condition: core.Operation => Boolean): Map[core.OperationType, Int] =
@@ -387,12 +361,6 @@ object Account extends Logging {
       val result = searchResult(op => op.getDate.compareTo(begin) >= 0 && op.getDate.compareTo(end) <= 0)
       preResult ::: List(result)
     }
-  }
-
-  private def standardTimePeriod(timePeriod: core.TimePeriod): Int = timePeriod match {
-    case core.TimePeriod.DAY => Calendar.DATE
-    case core.TimePeriod.MONTH => Calendar.MONTH
-    case core.TimePeriod.WEEK => Calendar.WEEK_OF_MONTH
   }
 
   def freshAddresses(a: core.Account)(implicit ec: ExecutionContext): Future[Seq[core.Address]] = {
