@@ -119,7 +119,9 @@ object Account extends Logging {
   private def asERC20Account(contract: String, a: core.Account): Either[Exception, ERC20LikeAccount] = {
     asETHAccount(a).flatMap(_.getERC20Accounts.asScala.find(_.getToken.getContractAddress == contract) match {
       case Some(t) => Right(t)
-      case None => Left(ERC20NotFoundException(contract))
+      case None =>
+        warn(s"Requested an erc20 account but it has not been found : $contract")
+        Left(ERC20NotFoundException(contract))
     })
   }
 

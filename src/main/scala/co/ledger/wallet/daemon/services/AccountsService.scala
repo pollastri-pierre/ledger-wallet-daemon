@@ -14,6 +14,7 @@ import co.ledger.wallet.daemon.clients.ApiClient.FallbackParams
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
+import co.ledger.wallet.daemon.exceptions.ERC20NotFoundException
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
@@ -134,7 +135,9 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     val balance = {
       daemonCache.withAccount(accountInfo)(a => {
         contract match {
-          case Some(c) => a.erc20Balance(c)
+          case Some(c) => a.erc20Balance(c).recoverWith({
+            case _: ERC20NotFoundException => Future(scala.BigInt(0))
+          })
           case None => a.balance
         }
       })
@@ -171,7 +174,9 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           operations.traverse { case (coreOp, erc20Op) =>
             Operations.getErc20View(erc20Op, coreOp, wallet, account)
           }
-        }
+        }.recoverWith( {
+          case _: ERC20NotFoundException => Future(List.empty)
+        })
     }
 
   def getBatchedERC20Operations(accountInfo: AccountInfo, offset: Long, batch: Int): Future[List[OperationView]] =
@@ -207,6 +212,9 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
 
   def getTokenCoreAccountBalanceHistory(tokenAccountInfo: TokenAccountInfo, startDate: Date, endDate: Date, period: core.TimePeriod): Future[List[BigInt]] = {
     getTokenCoreAccount(tokenAccountInfo).map(_.getBalanceHistoryFor(startDate, endDate, period).asScala.map(_.asScala).toList)
+      .recoverWith({
+        case _: ERC20NotFoundException => Future(List.empty)
+      })
   }
 
   def accountFreshAddresses(accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = {
