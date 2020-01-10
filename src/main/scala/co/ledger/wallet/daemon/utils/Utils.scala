@@ -1,5 +1,12 @@
 package co.ledger.wallet.daemon.utils
 
+import java.time.temporal.{ChronoUnit, TemporalAdjusters}
+import java.time.{DayOfWeek, LocalDate, ZoneId}
+import java.util.Date
+
+import co.ledger.core
+import co.ledger.core.TimePeriod
+
 import scala.collection.mutable
 
 object Utils {
@@ -35,7 +42,7 @@ object Utils {
   }
 
   implicit class AsArrayList[T](val input: Seq[T]) extends AnyVal {
-    def asArrayList : java.util.ArrayList[T] = new java.util.ArrayList[T](input.asJava)
+    def asArrayList: java.util.ArrayList[T] = new java.util.ArrayList[T](input.asJava)
   }
 
   def newConcurrentSet[T]: mutable.Set[T] = {
@@ -46,4 +53,24 @@ object Utils {
     def asScala: BigInt = BigInt(i.toString(10))
   }
 
+  /**
+    * Calculate how many values are expected regarding date interval and period
+    * Note that our API is proposing inclusive bound ranges whereas java is proposing exclusive end bounds
+    * @return How many partial or complete DAYs / WEEKs / MONTHs are involved inside the inclusive [start ; end] interval
+    */
+  def intervalSize(startInclusive: LocalDate, endInclusive: LocalDate, period: core.TimePeriod): Int = {
+    period match {
+      case TimePeriod.DAY => ChronoUnit.DAYS.between(startInclusive, endInclusive.plusDays(1)).intValue()
+      case TimePeriod.WEEK =>
+        ChronoUnit.WEEKS.between(
+          startInclusive `with` TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY),
+          (endInclusive `with` TemporalAdjusters.nextOrSame(DayOfWeek.SUNDAY)).plusDays(1)).intValue()
+      case TimePeriod.MONTH =>
+        ChronoUnit.MONTHS.between(
+          startInclusive `with` TemporalAdjusters.firstDayOfMonth(),
+          endInclusive `with` TemporalAdjusters.firstDayOfNextMonth()).intValue()
+    }
+  }
+
+  implicit def dateToLocalDate(date: Date): LocalDate = date.toInstant.atZone(ZoneId.systemDefault()).toLocalDate
 }

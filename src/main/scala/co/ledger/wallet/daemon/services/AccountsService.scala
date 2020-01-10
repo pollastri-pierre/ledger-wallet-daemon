@@ -22,6 +22,7 @@ import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
+import co.ledger.wallet.daemon.utils.Utils
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.twitter.finagle.Service
 import com.twitter.finagle.http.{Method, Request, Response}
@@ -136,7 +137,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
       daemonCache.withAccount(accountInfo)(a => {
         contract match {
           case Some(c) => a.erc20Balance(c).recoverWith({
-            case _: ERC20NotFoundException => Future(scala.BigInt(0))
+            case _: ERC20NotFoundException => Future.successful(scala.BigInt(0))
           })
           case None => a.balance
         }
@@ -175,7 +176,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
             Operations.getErc20View(erc20Op, coreOp, wallet, account)
           }
         }.recoverWith( {
-          case _: ERC20NotFoundException => Future(List.empty)
+          case _: ERC20NotFoundException => Future.successful(List.empty)
         })
     }
 
@@ -213,7 +214,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
   def getTokenCoreAccountBalanceHistory(tokenAccountInfo: TokenAccountInfo, startDate: Date, endDate: Date, period: core.TimePeriod): Future[List[BigInt]] = {
     getTokenCoreAccount(tokenAccountInfo).map(_.getBalanceHistoryFor(startDate, endDate, period).asScala.map(_.asScala).toList)
       .recoverWith({
-        case _: ERC20NotFoundException => Future(List.empty)
+        case _: ERC20NotFoundException => Future.successful(List.fill(Utils.intervalSize(startDate, endDate, period))(BigInt(0)))
       })
   }
 
@@ -250,7 +251,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) =>
         account.firstOperation flatMap {
-          case None => Future(None)
+          case None => Future.successful(None)
           case Some(o) => Operations.getView(o, wallet, account).map(Some(_))
         }
     }
