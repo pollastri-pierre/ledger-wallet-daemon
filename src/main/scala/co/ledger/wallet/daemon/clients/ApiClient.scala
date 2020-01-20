@@ -6,9 +6,11 @@ import co.ledger.wallet.daemon.utils.HexUtils
 import co.ledger.wallet.daemon.utils.Utils._
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.{Method, Request, Response}
+import com.twitter.finagle.service.{Backoff, RetryBudget}
 import com.twitter.finagle.{Http, Service}
 import com.twitter.finatra.json.FinatraObjectMapper
 import com.twitter.inject.Logging
+import com.twitter.util.Duration
 import io.circe.Json
 import javax.inject.Singleton
 
@@ -41,7 +43,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     service(request).map { response =>
       import io.circe.parser.parse
       val json = parse(response.contentString)
-      val result = json.flatMap{ j =>
+      val result = json.flatMap { j =>
         for {
           rippleResult <- j.hcursor.get[Json]("result")
           rippleState <- rippleResult.hcursor.get[Json]("state")
@@ -55,14 +57,14 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         }
       }
 
-      result.getOrElse{
+      result.getOrElse {
         info(s"Failed to query server_state method of ripple daemon: " +
           s"uri=${host} request=${request.contentString} response=${response.contentString}")
         defaultXRPFees
       }
 
     }
-  }.asScala()
+    }.asScala()
 
   def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
     import io.circe.syntax._
@@ -103,7 +105,19 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   }
 
   private val mapper: FinatraObjectMapper = FinatraObjectMapper.create()
-  private val client = Http.client.withSessionPool.maxSize(DaemonConfiguration.explorer.api.connectionPoolSize)
+  private val budget: RetryBudget = RetryBudget(
+    ttl = Duration.fromSeconds(DaemonConfiguration.explorer.client.retryTtl),
+    minRetriesPerSec = DaemonConfiguration.explorer.client.retryMin,
+    percentCanRetry = DaemonConfiguration.explorer.client.retryPercent
+  )
+
+  private val client = Http.client
+    .withRetryBudget(budget)
+    .withRetryBackoff(Backoff.linear(
+      Duration.fromMilliseconds(DaemonConfiguration.explorer.client.retryBackoff),
+      Duration.fromMilliseconds(DaemonConfiguration.explorer.client.retryBackoff)))
+    .withSessionPool.maxSize(DaemonConfiguration.explorer.client.connectionPoolSize)
+    .withSessionPool.ttl(Duration.fromSeconds(DaemonConfiguration.explorer.client.connectionTtl))
 
   private val services: Map[String, (String, Service[Request, Response])] =
     DaemonConfiguration.explorer.api.paths
@@ -118,13 +132,15 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
       }
   lazy private val fallbackClientServices: Map[String, (FallbackParams, Service[Request, Response])] = {
     DaemonConfiguration.explorer.api.paths
-      .mapValues{ config =>
+      .mapValues { config =>
         for {
           f <- config.filterPrefix.fallback
           r <- f.split("/", 2).toList match {
             case host :: query :: _ =>
               val c = DaemonConfiguration.proxy match {
-                case Some(proxy) => client.withTransport.httpProxyTo(s"${host}:443").withTls(host).newService(s"${proxy.host}:${proxy.port}")
+                case Some(proxy) => client.withTransport.httpProxyTo(s"${host}:443")
+                  .withTls(host)
+                  .newService(s"${proxy.host}:${proxy.port}")
                 case None => client.withTls(host).newService(s"${host}:443")
               }
               Some(FallbackParams(s"${host}:443", "/" + query), c)
@@ -132,9 +148,9 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
               None
           }
         } yield r
-      }.collect{
-        case (currency, opt) if opt.isDefined => (currency, opt.get)
-      }
+      }.collect {
+      case (currency, opt) if opt.isDefined => (currency, opt.get)
+    }
   }
 
   def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
@@ -169,12 +185,13 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 }
 
 object ApiClient {
+
   case class FallbackParams(host: String, query: String)
 
   case class FeeInfo(
-                    @JsonProperty("1") fast: BigInt,
-                    @JsonProperty("3") normal: BigInt,
-                    @JsonProperty("6") slow: BigInt) {
+                      @JsonProperty("1") fast: BigInt,
+                      @JsonProperty("3") normal: BigInt,
+                      @JsonProperty("6") slow: BigInt) {
 
     def getAmount(feeMethod: FeeMethod): BigInt = feeMethod match {
       case FeeMethod.FAST => fast / 1000
@@ -184,5 +201,7 @@ object ApiClient {
   }
 
   case class GasPrice(@JsonProperty("gas_price") price: BigInt)
+
   case class GasLimit(@JsonProperty("estimated_gas_limit") limit: BigInt)
+
 }

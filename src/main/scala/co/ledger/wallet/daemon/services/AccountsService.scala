@@ -14,15 +14,15 @@ import co.ledger.wallet.daemon.clients.ApiClient.FallbackParams
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
-import co.ledger.wallet.daemon.exceptions.ERC20NotFoundException
+import co.ledger.wallet.daemon.exceptions.{ERC20NotFoundException, FallbackBalanceProviderException}
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
-import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
 import co.ledger.wallet.daemon.utils.Utils
+import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.twitter.finagle.Service
 import com.twitter.finagle.http.{Method, Request, Response}
@@ -33,7 +33,7 @@ import org.web3j.abi.{FunctionEncoder, TypeReference}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 @Singleton
 class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService {
@@ -106,29 +106,29 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
               encodeBalanceFunction(address).map { data =>
                 s"""{"jsonrpc":"2.0","method":"eth_call","params":[{"to": "$contractAddress", "data": "$data"}, "latest"],"id":1}"""
               }
-            case None =>
-              Success(s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}""")
+            case None => Success(s"""{"jsonrpc":"2.0","method":"eth_getBalance","params":["$address", "latest"],"id":1}""")
           }))
           response <- {
             val request = Request(Method.Post, fallback.query).host(fallback.host)
-
             request.setContentString(body)
             request.setContentType("application/json")
-
-            OptionT.liftF(client(request).asScala())
+            val fut: Future[Response] = client(request).asScala()
+            fut.onComplete {
+              case Success(v) => info(s"Successfully retrieve json response from provider : $v")
+              case Failure(t) => error("Unable to fetch from fallback provider", t)
+            }
+            OptionT.liftF(fut)
           }
           result <- OptionT.liftF(Future.fromTry(Try {
             import io.circe.parser.parse
             val json = parse(response.contentString)
             val balance = json.flatMap { j =>
               j.hcursor.get[String]("result")
-            }.map(_.replaceFirst("0x", ""))
-              .map(BigInt(_, 16))
-
+            }.map(_.replaceFirst("0x", "")).map(BigInt(_, 16))
             balance.getOrElse(throw new Exception("Failed to parse fallback provider result"))
           }))
         } yield result
-        result.getOrElseF(Future.failed(new Exception("Unable to fetch from fallback provider")))
+        result.getOrElseF(Future.failed(FallbackBalanceProviderException(accountInfo.walletInfo.walletName, fallback.host, fallback.query)))
       }
     }
 
@@ -147,8 +147,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.withWallet(accountInfo.walletInfo) { wallet =>
       ClientFactory.apiClient.fallbackClient(wallet.getCurrency.getName) match {
         case Some((fallback, client)) =>
-          val timeout = DaemonConfiguration.explorer.api.fallbackTimeout.milliseconds
-          runWithFallback(balance, fallback, client, timeout)
+          runWithFallback(balance, fallback, client, DaemonConfiguration.explorer.api.fallbackTimeout.milliseconds)
         case None =>
           balance
       }
@@ -175,7 +174,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
           operations.traverse { case (coreOp, erc20Op) =>
             Operations.getErc20View(erc20Op, coreOp, wallet, account)
           }
-        }.recoverWith( {
+        }.recoverWith({
           case _: ERC20NotFoundException => Future.successful(List.empty)
         })
     }

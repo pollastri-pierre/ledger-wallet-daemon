@@ -32,8 +32,9 @@ import scala.collection.JavaConverters._
 object Account extends Logging {
 
   implicit class RichCoreAccount(val a: core.Account) extends AnyVal {
-    def erc20Balance(contract: String)(implicit ec: ExecutionContext): Future[scala.BigInt] =
+    def erc20Balance(contract: String)(implicit ec: ExecutionContext): Future[scala.BigInt] = {
       Account.erc20Balance(contract, a)
+    }
 
     def erc20Balances(contracts: Option[Array[String]])(implicit ex: ExecutionContext): Future[Seq[scala.BigInt]] = {
       val contractList = (contracts.getOrElse(a.asEthereumLikeAccount().getERC20Accounts.asScala.toArray.map(ercAccount => ercAccount.getToken.getContractAddress)))

@@ -44,6 +44,11 @@ case class WalletPoolAlreadyExistException(poolName: String) extends {
   val code = ErrorCodes.WALLET_POOL_ALREADY_EXIST
 } with DaemonException(msg)
 
+case class FallbackBalanceProviderException(currency: String, host: String, query: String) extends {
+  val msg = s"Failed to retrieve balance for $currency currency on host= $host with query= $query"
+  val code = ErrorCodes.PROVIDER_BALANCE_EXCEPTION
+} with DaemonException(msg)
+
 case class CurrencyNotFoundException(currencyName: String) extends {
   val msg = s"Currency $currencyName is not found"
   val code = ErrorCodes.CURRENCY_NOT_FOUND
@@ -115,4 +120,5 @@ object ErrorCodes {
   val SYNC_ON_GOING = 212
   val CORE_BAD_REQUEST = 301
   val DAEMON_DATABASE_EXCEPTION = 302
+  val PROVIDER_BALANCE_EXCEPTION = 303
 }
