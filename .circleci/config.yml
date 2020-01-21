@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   docker: ledger/docker@volatile
+  codecov: codecov/codecov@1.0.2
 
 aliases:
   - &filter_all_tags
@@ -58,9 +59,10 @@ jobs:
       - checkout
       - restore_cache: *dependencies_cache
       - run:
-          name: Run integration tests
-          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt it:test
-
+          name: Run integration tests and code coverage
+          command: sbt -Dsbt.ivy.home=.ivy2 -sbt-dir .sbt clean coverage it:test coverageReport
+      - codecov/upload:
+          file: target/scala-2.12/coverage-report/cobertura.xml
 
 workflows:
   build_test_and_publish:

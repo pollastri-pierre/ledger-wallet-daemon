@@ -1,4 +1,16 @@
-# ledger-wallet-daemon &middot; [![CircleCI](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon.svg?style=shield)](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon)
+# ledger-wallet-daemon &middot; 
+
+[![CircleCI](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon.svg?style=shield)](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon)
+[![codecov](https://codecov.io/gh/LedgerHQ/ledger-wallet-daemon/branch/develop/graph/badge.svg)](https://codecov.io/gh/LedgerHQ/ledger-wallet-daemon)
+[![Generic badge](https://img.shields.io/badge/Version-2.4.3-blue)](https://shields.io/)
+
+
+## Run Integration Tests with coverage locally
+ ```bash
+sbt clean coverage it:test coverageReport
+```
+
+Once generated, an html report can be found at `target/scala-2.12/scoverage-report/index.html`
 
 ## Updating the libcore
 
