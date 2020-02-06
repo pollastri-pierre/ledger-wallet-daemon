@@ -247,7 +247,13 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
   private def buildWalletConfig(currencyName: String): core.DynamicObject = {
     val walletConfig = core.DynamicObject.newInstance()
     val apiUrl = DaemonConfiguration.explorer.api.paths.get(currencyName) match {
-      case Some(path) => path.host
+      case Some(path) =>
+        path.explorerVersion match {
+          case Some(version) =>
+            walletConfig.putString("BLOCKCHAIN_EXPLORER_VERSION", version)
+          case _ =>
+        }
+        path.host
       case None => ConfigurationDefaults.BLOCKCHAIN_DEFAULT_API_ENDPOINT
     }
     walletConfig.putString("BLOCKCHAIN_EXPLORER_API_ENDPOINT", apiUrl)

@@ -85,27 +85,42 @@ explorer = {
         port = 80
       }
       {
+        currency = bitcoin
+        host = "api.ledgerwallet.com"
+        host = ${?WALLET_BTC_EXPLORER_ENDPOINT}
+        port = 80
+        port = ${?WALLET_BTC_EXPLORER_PORT}
+        explorer_version = "v2"
+        explorer_version = ${?WALLET_BTC_EXPLORER_VERSION}
+       }
+      {
         currency = ethereum
-        host = "http://eth-mainnet.explorers.dev.aws.ledger.fr"
+        host = "https://explorers.api.live.ledger.com"
         host = ${?WALLET_ETH_EXPLORER_ENDPOINT}
         port = 80
         port = ${?WALLET_ETH_EXPLORER_PORT}
+        explorer_version = "v3"
+        explorer_version = ${?WALLET_ETH_EXPLORER_VERSION}
         fallback = "https://mainnet.infura.io/v3/c0c3514370b2454d9e58a001876167af"
         fallback = ${?WALLET_ETH_EXPLORER_FALLBACK}
       }
       {
         currency = ethereum_classic
-        host = "http://eth-classic.explorers.dev.aws.ledger.fr"
+        host = "https://explorers.api.live.ledger.com"
         host = ${?WALLET_ETC_EXPLORER_ENDPOINT}
         port = 80
         port = ${?WALLET_ETC_EXPLORER_PORT}
+        explorer_version = "v3"
+        explorer_version = ${?WALLET_ETC_EXPLORER_VERSION}
       }
       {
         currency = ethereum_ropsten
-        host = "http://eth-ropsten.explorers.dev.aws.ledger.fr"
+        host = "https://explorers.api.live.ledger.com"
         host = ${?WALLET_ETH_ROPSTEN_EXPLORER_ENDPOINT}
         port = 80
         port = ${?WALLET_ETH_ROPSTEN_EXPLORER_PORT}
+        explorer_version = "v3"
+        explorer_version = ${?WALLET_ETH_ROPSTEN_EXPLORER_VERSION}
         fallback = "ropsten.infura.io/v3/c0c3514370b2454d9e58a001876167af"
         fallback = ${?WALLET_ETH_ROPSTEN_EXPLORER_FALLBACK}
       }

@@ -16,6 +16,7 @@ import javax.inject.Singleton
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import scala.collection.JavaConverters._
 
 // TODO: Map response from service to be more readable
 @Singleton
@@ -24,11 +25,18 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   import ApiClient._
 
   def getFees(currencyName: String): Future[FeeInfo] = {
-    val path = paths.getOrElse(currencyName, throw new UnsupportedOperationException(s"Currency not supported '$currencyName'"))
+    val path = getPathForCurrency(currencyName)
     val (host, service) = services.getOrElse(currencyName, services("default"))
     val request = Request(Method.Get, path).host(host)
     service(request).map { response =>
-      mapper.parse[FeeInfo](response)
+      mapper.objectMapper.readTree(response.contentString)
+        .fields.asScala.filter(_.getKey forall Character.isDigit)
+        .map(_.getValue.asInt).toList.sorted.map(BigInt.apply) match {
+        case low::medium::high::Nil => FeeInfo(high, medium, low)
+        case _ =>
+          warn(s"Failed to retrieve fees from explorer, falling back on default fees.")
+          defaultBTCFeeInfo
+      }
     }.asScala()
   }
 
@@ -96,7 +104,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 
   def getGasPrice(currencyName: String): Future[BigInt] = {
     val (host, service) = services.getOrElse(currencyName, services("default"))
-    val path = paths.getOrElse(currencyName, throw new UnsupportedOperationException(s"Currency not supported '$currencyName'"))
+    val path = getPathForCurrency(currencyName)
     val request = Request(Method.Get, path).host(host)
 
     service(request).map { response =>
@@ -125,8 +133,8 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         val p = path.filterPrefix
         currency -> (s"${p.host}:${p.port}", {
           DaemonConfiguration.proxy match {
-            case Some(proxy) => client.withTransport.httpProxyTo(s"${p.host}:${p.port}").newService(s"${proxy.host}:${proxy.port}")
-            case None => client.newService(s"${p.host}:${p.port}")
+            case Some(proxy) => client.withTransport.httpProxyTo(s"${p.host}:${p.port}").withTls(proxy.host).newService(s"${proxy.host}:${proxy.port}")
+            case None => client.withTls(p.host).newService(s"${p.host}:${p.port}")
           }
         })
       }
@@ -157,7 +165,15 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     fallbackClientServices.get(currency)
   }
 
-  private val paths: Map[String, String] = {
+  private def getPathForCurrency(currencyName: String): String = {
+  val path = mappedPaths.getOrElse(currencyName, throw new UnsupportedOperationException(s"Currency not supported '$currencyName'"))
+    DaemonConfiguration.explorer.api.paths.get(currencyName).flatMap(_.explorerVersion) match {
+      case Some(version) => path.replaceFirst("/v[0-9]+/", s"/$version/")
+      case _ => path
+    }
+  }
+
+  private val mappedPaths: Map[String, String] = {
     Map(
       "bitcoin" -> "/blockchain/v2/btc/fees",
       "bitcoin_testnet" -> "/blockchain/v2/btc_testnet/fees",
@@ -182,17 +198,16 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   }
   private val defaultGasLimit = BigInt(200000)
   private val defaultXRPFees = BigInt(10)
+
+  // {"2":18281,"3":12241,"6":10709,"last_updated":1580478904}
+  private val defaultBTCFeeInfo = FeeInfo(18281, 12241, 10709)
 }
 
 object ApiClient {
 
   case class FallbackParams(host: String, query: String)
 
-  case class FeeInfo(
-                      @JsonProperty("1") fast: BigInt,
-                      @JsonProperty("3") normal: BigInt,
-                      @JsonProperty("6") slow: BigInt) {
-
+  case class FeeInfo(fast: BigInt, normal: BigInt, slow: BigInt) {
     def getAmount(feeMethod: FeeMethod): BigInt = feeMethod match {
       case FeeMethod.FAST => fast / 1000
       case FeeMethod.NORMAL => normal / 1000
