@@ -220,9 +220,9 @@ object DaemonConfiguration {
   case class PathConfig(host: String, port: Int, fallback: Option[String], explorerVersion: Option[String]) {
     def filterPrefix: PathConfig = {
       PathConfig(
-        host.replaceFirst(".+?://", ""),
+        host,
         port,
-        fallback.map(_.replaceFirst(".+?://", "")),
+        fallback,
         explorerVersion)
     }
   }

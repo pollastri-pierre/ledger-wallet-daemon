@@ -1,5 +1,7 @@
 package co.ledger.wallet.daemon.clients
 
+import java.net.URL
+
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.models.FeeMethod
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -130,34 +132,33 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   private val services: Map[String, (String, Service[Request, Response])] =
     DaemonConfiguration.explorer.api.paths
       .map { case (currency, path) =>
-        val p = path.filterPrefix
-        currency -> (s"${p.host}:${p.port}", {
+        val url = new URL(s"${path.host}:${path.port}")
+        currency -> (s"${path.host}:${path.port}", {
           DaemonConfiguration.proxy match {
-            case Some(proxy) => tls(proxy.host, client).withTransport.httpProxyTo(s"${p.host}:${p.port}").newService(s"${proxy.host}:${proxy.port}")
-            case None => tls(p.host, client).newService(s"${p.host}:${p.port}")
+              // We assume that proxy is behind TLS
+            case Some(proxy) => client.withTls(proxy.host).withTransport.httpProxyTo(s"${url.getHost}:${resolvePort(url)}").newService(s"${proxy.host}:${proxy.port}")
+            case None => tls(url, client).newService(s"${url.getHost}:${resolvePort(url)}")
           }
         })
       }
   lazy private val fallbackClientServices: Map[String, (FallbackParams, Service[Request, Response])] = {
     DaemonConfiguration.explorer.api.paths
-      .mapValues { config =>
-        for {
-          f <- config.filterPrefix.fallback
-          r <- f.split("/", 2).toList match {
-            case host :: query :: _ =>
-              val c = DaemonConfiguration.proxy match {
-                case Some(proxy) => tls(host, client).withTransport.httpProxyTo(s"${host}:443")
-                  .newService(s"${proxy.host}:${proxy.port}")
-                case None => tls(host, client).newService(s"${host}:443")
-              }
-              Some(FallbackParams(s"${host}:443", "/" + query), c)
-            case _ =>
-              None
-          }
-        } yield r
-      }.collect {
-      case (currency, opt) if opt.isDefined => (currency, opt.get)
-    }
+      .mapValues(config => {
+        config.filterPrefix.fallback.map(new URL(_)) match {
+          case Some(url) =>
+            val c = DaemonConfiguration.proxy match {
+              case Some(proxy) => tls(url, client).withTransport.httpProxyTo(s"${url.getHost}:${resolvePort(url)}")
+                .newService(s"${proxy.host}:${proxy.port}")
+              case None => tls(url, client).newService(s"${url.getHost}:${resolvePort(url)}")
+            }
+            Some(FallbackParams(s"${url.getHost}:${resolvePort(url)}", "/" + url.getQuery), c)
+          case _ =>
+            None
+        }
+      })
+      .collect {
+        case (currency, opt) if opt.isDefined => (currency, opt.get)
+      }
   }
 
   def fallbackClient(currency: String): Option[(FallbackParams, Service[Request, Response])] = {
@@ -173,10 +174,19 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   }
 
   // FIXME : remove when Scala http client #BACK-405 is available
-  def tls(host: String, client: Http.Client): Http.Client =
-    if (host.startsWith("https")) {
-      client.withTls(host)
-    } else client
+  def tls(url: URL, client: Http.Client): Http.Client = {
+    url.getProtocol match {
+      case "https" => client.withTls(url.getHost)
+      case _ => client
+    }
+  }
+
+  def resolvePort(url: URL): Int = {
+    Option(url.getPort) match {
+      case Some(port) if (port > 0) => port
+      case _ => 80 // 80 default
+    }
+  }
 
   private val mappedPaths: Map[String, String] = {
     Map(
@@ -201,11 +211,14 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
       "ethereum_ropsten" -> "/blockchain/v3/fees"
     )
   }
-  private val defaultGasLimit = BigInt(200000)
-  private val defaultXRPFees = BigInt(10)
+  private val defaultGasLimit =
+    BigInt(200000)
+  private val defaultXRPFees =
+    BigInt(10)
 
   // {"2":18281,"3":12241,"6":10709,"last_updated":1580478904}
-  private val defaultBTCFeeInfo = FeeInfo(18281, 12241, 10709)
+  private val defaultBTCFeeInfo =
+    FeeInfo(18281, 12241, 10709)
 }
 
 object ApiClient {
