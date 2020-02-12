@@ -14,9 +14,9 @@ import com.twitter.util.Duration
 import io.circe.Json
 import javax.inject.Singleton
 
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
-import scala.collection.JavaConverters._
 
 // TODO: Map response from service to be more readable
 @Singleton
@@ -32,7 +32,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
       mapper.objectMapper.readTree(response.contentString)
         .fields.asScala.filter(_.getKey forall Character.isDigit)
         .map(_.getValue.asInt).toList.sorted.map(BigInt.apply) match {
-        case low::medium::high::Nil => FeeInfo(high, medium, low)
+        case low :: medium :: high :: Nil => FeeInfo(high, medium, low)
         case _ =>
           warn(s"Failed to retrieve fees from explorer, falling back on default fees.")
           defaultBTCFeeInfo
@@ -133,8 +133,8 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         val p = path.filterPrefix
         currency -> (s"${p.host}:${p.port}", {
           DaemonConfiguration.proxy match {
-            case Some(proxy) => client.withTransport.httpProxyTo(s"${p.host}:${p.port}").withTls(proxy.host).newService(s"${proxy.host}:${proxy.port}")
-            case None => client.withTls(p.host).newService(s"${p.host}:${p.port}")
+            case Some(proxy) => tls(proxy.host, client).withTransport.httpProxyTo(s"${p.host}:${p.port}").newService(s"${proxy.host}:${proxy.port}")
+            case None => tls(p.host, client).newService(s"${p.host}:${p.port}")
           }
         })
       }
@@ -146,10 +146,9 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
           r <- f.split("/", 2).toList match {
             case host :: query :: _ =>
               val c = DaemonConfiguration.proxy match {
-                case Some(proxy) => client.withTransport.httpProxyTo(s"${host}:443")
-                  .withTls(host)
+                case Some(proxy) => tls(host, client).withTransport.httpProxyTo(s"${host}:443")
                   .newService(s"${proxy.host}:${proxy.port}")
-                case None => client.withTls(host).newService(s"${host}:443")
+                case None => tls(host, client).newService(s"${host}:443")
               }
               Some(FallbackParams(s"${host}:443", "/" + query), c)
             case _ =>
@@ -166,12 +165,18 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
   }
 
   private def getPathForCurrency(currencyName: String): String = {
-  val path = mappedPaths.getOrElse(currencyName, throw new UnsupportedOperationException(s"Currency not supported '$currencyName'"))
+    val path = mappedPaths.getOrElse(currencyName, throw new UnsupportedOperationException(s"Currency not supported '$currencyName'"))
     DaemonConfiguration.explorer.api.paths.get(currencyName).flatMap(_.explorerVersion) match {
       case Some(version) => path.replaceFirst("/v[0-9]+/", s"/$version/")
       case _ => path
     }
   }
+
+  // FIXME : remove when Scala http client #BACK-405 is available
+  def tls(host: String, client: Http.Client): Http.Client =
+    if (host.startsWith("https")) {
+      client.withTls(host)
+    } else client
 
   private val mappedPaths: Map[String, String] = {
     Map(
