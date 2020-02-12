@@ -17,7 +17,7 @@ services:
       - "5432:5432"
     command: -c "ssl=on" -c "ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key" -c "ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem"
   wallet-daemon:
-    image: ledgerhq/ledger-wallet-daemon:alpha-pg-1
+    image: ledgerhq/ledger-wallet-daemon:latest
     environment:
       CORE_DATABASE_ENGINE: postgres
       CORE_PG_HOST: postgres-server-ssl
@@ -26,7 +26,7 @@ services:
       CORE_PG_DB_NAME_PREFIX: wallet_daemon_
     entrypoint: /app/run.sh -Dscala.concurrent.context.numThreads=x8 -Dscala.concurrent.context.maxThreads=x8
     healthcheck:
-      test: "command -v curl && curl -fsS -H 'pubKey: 0327015350DF6FA1CFAFA8FFD09307724EE3F723A07D5EBD26646796E4A64DC550' http://wallet-daemon:9200/_health"
+      test: "command -v curl && curl -fsS http://wallet-daemon:9200/_health"
       interval: 30s
       timeout: 5s
       retries: 3

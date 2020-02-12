@@ -95,13 +95,23 @@ When a new version of the libcore is available, we need to update our bindings.
 
 ### Configuration
 
-
 1. By default, Wallet Daemon is using Sqlite3 by default, to activate PostgreSQL set: 
     ```
     CORE_DATABASE_ENGINE=postgres
     ``` 
-2. Setting the PostgreSQL URL connection is done through: `PG_URL`, by default set to `postgres://localhost:5432`,    
-3. It is possible to set the connection pool size per wallet pool (e.g. by client) thanks to: 
-`PG_CONNECTION_POOL_SIZE_PER_WALLET_POOL`, which is equal to `2` by default. 
+2. Setting the PostgreSQL connection mandatory infos by setting : 
+`CORE_PG_HOST`, `CORE_PG_PORT`, `CORE_PG_USER` and `CORE_PG_PWD` 
+which are respectively the hostname, the port exposed by postgres the user and the password to use for establishing the connection.
+We are supporting SSL connections. 
 
+3. It is possible to set the connection pool size per wallet pool (e.g. by client) thanks to: 
+`PG_CONNECTION_POOL_SIZE_PER_WALLET_POOL`, which is equal to `2` by default and also a prefix name for every databases created by the libcore by setting `CORE_PG_DB_NAME_PREFIX` example : `CORE_PG_DB_NAME_PREFIX=WD_`
+
+### Run Dockerized Wallet Daemon locally with docker compose
+Please have a look on  [Docker compose configuration file](docker-compose.yml) for more details on configuration. 
+This will create a PostgreSql instance with SSL enabled and the latest development image of wallet daemon ready to talk with.
+
+```
+docker-compose up 
+```
 
