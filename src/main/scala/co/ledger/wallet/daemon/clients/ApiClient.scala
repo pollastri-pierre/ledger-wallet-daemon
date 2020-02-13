@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.clients
 
 import java.net.URL
 
+import co.ledger.core
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.models.FeeMethod
 import co.ledger.wallet.daemon.utils.HexUtils
@@ -76,11 +77,11 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     }
     }.asScala()
 
-  def getGasLimit(currencyName: String, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
+  def getGasLimit(currency: core.Currency, recipient: String, source: Option[String] = None, inputData: Option[Array[Byte]] = None): Future[BigInt] = {
     import io.circe.syntax._
-    val (host, service) = services.getOrElse(currencyName, services("default"))
+    val (host, service) = services.getOrElse(currency.getName, services("default"))
 
-    val uri = s"/blockchain/v3/addresses/${recipient.toLowerCase}/estimate-gas-limit"
+    val uri = s"/blockchain/v3/${currency.getEthereumLikeNetworkParameters.getIdentifier}/addresses/${recipient.toLowerCase}/estimate-gas-limit"
     val request = Request(
       Method.Post,
       uri
@@ -135,7 +136,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
         val url = new URL(s"${path.host}:${path.port}")
         currency -> (s"${path.host}:${path.port}", {
           DaemonConfiguration.proxy match {
-              // We assume that proxy is behind TLS
+            // We assume that proxy is behind TLS
             case Some(proxy) => client.withTls(proxy.host).withTransport.httpProxyTo(s"${url.getHost}:${resolvePort(url)}").newService(s"${proxy.host}:${proxy.port}")
             case None => tls(url, client).newService(s"${url.getHost}:${resolvePort(url)}")
           }
@@ -181,10 +182,16 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
     }
   }
 
+  val HTTP_DEFAULT_PORT = 80
+  val HTTPS_DEFAULT_PORT = 443
+
   def resolvePort(url: URL): Int = {
     Option(url.getPort) match {
       case Some(port) if (port > 0) => port
-      case _ => 80 // 80 default
+      case _ => url.getProtocol match {
+        case "https" => HTTPS_DEFAULT_PORT
+        case _ => HTTP_DEFAULT_PORT
+      }
     }
   }
 
@@ -206,9 +213,9 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
       "peercoin" -> "/blockchain/v2/ppc/fees",
       "bitcoin_gold" -> "/blockchain/v2/btg/fees",
       "zcash" -> "/blockchain/v2/zec/fees",
-      "ethereum" -> "/blockchain/v3/fees",
-      "ethereum_classic" -> "/blockchain/v3/fees",
-      "ethereum_ropsten" -> "/blockchain/v3/fees"
+      "ethereum" -> "/blockchain/v3/eth/fees",
+      "ethereum_classic" -> "/blockchain/v3/etc/fees",
+      "ethereum_ropsten" -> "/blockchain/v3/eth_ropsten/fees"
     )
   }
   private val defaultGasLimit =

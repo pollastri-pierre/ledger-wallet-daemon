@@ -20,7 +20,7 @@ postgres = {
     password = ${?CORE_PG_PWD}
     db_name_prefix = ""
     db_name_prefix = ${?CORE_PG_DB_NAME_PREFIX}
-    pool_size = 30
+    pool_size = 3
     pool_size = ${?CORE_PG_CONNECTION_POOL_SIZE_PER_WALLET_POOL}
 }
 
@@ -138,7 +138,7 @@ explorer = {
         port = ${?WALLET_ETH_ROPSTEN_EXPLORER_PORT}
         explorer_version = "v3"
         explorer_version = ${?WALLET_ETH_ROPSTEN_EXPLORER_VERSION}
-        fallback = "ropsten.infura.io/v3/c0c3514370b2454d9e58a001876167af"
+        fallback = "https://ropsten.infura.io/v3/c0c3514370b2454d9e58a001876167af"
         fallback = ${?WALLET_ETH_ROPSTEN_EXPLORER_FALLBACK}
       }
       {

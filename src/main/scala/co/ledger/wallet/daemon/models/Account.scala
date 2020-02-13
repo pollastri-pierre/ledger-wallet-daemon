@@ -20,14 +20,14 @@ import co.ledger.wallet.daemon.models.coins.{Bitcoin, UnsignedEthereumTransactio
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
+import co.ledger.wallet.daemon.utils.Utils.RichBigInt
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.common.primitives.UnsignedInteger
 import com.twitter.inject.Logging
-import co.ledger.wallet.daemon.utils.Utils.RichBigInt
 
 import scala.annotation.tailrec
-import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.collection.JavaConverters._
+import scala.concurrent.{ExecutionContext, Future, Promise}
 
 object Account extends Logging {
 
@@ -258,7 +258,7 @@ object Account extends Logging {
     for {
       gasLimit <- ti.gasLimit match {
         case Some(amount) => Future.successful(amount)
-        case None => ClientFactory.apiClient.getGasLimit(c.getName, ti.contract.getOrElse(ti.recipient))
+        case None => ClientFactory.apiClient.getGasLimit(c, ti.contract.getOrElse(ti.recipient))
       }
     } yield {
       a.asEthereumLikeAccount()
@@ -279,7 +279,7 @@ object Account extends Logging {
           gasLimit <- ti.gasLimit match {
             case Some(amount) => Future.successful(amount)
             case None => ClientFactory.apiClient.getGasLimit(
-              c.getName, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
+              c, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
           }
         } yield {
           a.asEthereumLikeAccount()
