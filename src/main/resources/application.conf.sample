@@ -2,6 +2,11 @@ database_engine = "sqlite3"
 core_database_engine = "sqlite3"
 core_database_engine = ${?CORE_DATABASE_ENGINE}
 
+core = {
+  ops_threads_factor = 4
+  ops_threads_factor = ${?CORE_OPS_THREADS_FACTOR}
+}
+
 sqlite3 = {
   url = "jdbc:sqlite:database.db"
   url = ${?WALLET_JDBC_URL}

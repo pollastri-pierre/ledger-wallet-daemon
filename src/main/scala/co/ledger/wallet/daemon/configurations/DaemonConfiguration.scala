@@ -22,6 +22,7 @@ object DaemonConfiguration {
   private val DEFAULT_CLIENT_CONNECTION_RETRY_MIN: Int = 5 // Number of minimum retries per second
   private val DEFAULT_CLIENT_CONNECTION_RETRY_PERCENT: Double = 1.0D // 100% of queries would be retried at least one time
   private val DEFAULT_CLIENT_CONNECTION_RETRY_BACKOFF: Int = 50 // Linear Backoff policy delta ms
+  private val DEFAULT_CORE_POOL_THREADS_FACTOR: Int = 4 // Default value for allocated threads per pool for core lib
 
   /*
    * We set the value of RIPPLE_LAST_LEDGER_SEQUENCE_OFFSET to be large enough
@@ -142,12 +143,10 @@ object DaemonConfiguration {
 
   // The core pool operation size
   val corePoolOpSizeFactor: Int =
-    if (config.hasPath("core.threads.ops.factor")) {
-      config.getInt("core.threads.ops.factor")
+    if (config.hasPath("core.ops_threads_factor")) {
+      config.getInt("core.ops_threads_factor")
     }
-    else {
-      4
-    }
+    else DEFAULT_CORE_POOL_THREADS_FACTOR
 
   // The maximum size of pagination token cache
   val balanceCacheMaxSize: Long =

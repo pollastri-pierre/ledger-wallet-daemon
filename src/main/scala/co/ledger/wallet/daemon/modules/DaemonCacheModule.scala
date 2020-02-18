@@ -31,6 +31,7 @@ object DaemonCacheModule extends TwitterModule {
 
   override def singletonPostWarmupComplete(injector: Injector): Unit = {
     val poolsService = injector.instance[PoolsService](classOf[PoolsService])
+    info(s"Core operation pool cpu factor is ${DaemonConfiguration.corePoolOpSizeFactor}")
 
     def synchronizationTask(): Unit = {
       try {
