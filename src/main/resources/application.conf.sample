@@ -48,6 +48,7 @@ h2mem1 = {
 }
 
 authentication = {
+  disable = true
   token_duration_in_seconds = 3600
 }
 
