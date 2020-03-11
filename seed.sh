@@ -143,4 +143,6 @@ for ((i=0;i<${#clients_data[@]}/2;i++))
 
 printf "\xF0\x9F\x9A\x80   Successfully reseeded Wallet Daemon !"
 
+# Remove tmp directory
+rm -rf tmp
 exit 0
