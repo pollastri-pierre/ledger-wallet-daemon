@@ -3,7 +3,8 @@
 # from database.db which contains users' names
 host=$1
 port=$2
-drop_mode=$3
+prefix=$3
+drop_mode=$4
 
 command=createdb
 if [ -n "$drop_mode" ]; then
@@ -26,7 +27,8 @@ read -ra array <<< "$names"
 # Create all DBs with users' names as database names
 for elem in "${array[@]}"
 do
-    $command -h $host -p $port $elem
+    echo "$command -h $host -p $port -U ledger ${prefix}_${elem}"
+    $command -h $host -p $port -U ledger ${prefix}_${elem}
 done
 
 

@@ -5,7 +5,7 @@
 ########
 ########
 ########    Usage with SQLite:
-########    $> bash seed.sh <path_to_client_database> <path_to_core_database>
+########    $> bash seed.sh <daemon_endpoint> <path_to_client_database> <path_to_core_database>
 ########    - client_database: database keeping client's names, public keys (generally located at root project and named `database.db`),
 ########    - core_database: core database used by the libcore (SQLite and PostgreSQL are supported).
 ########    Example :
@@ -13,7 +13,7 @@
 ########
 ########
 ########    Usage with PostgreSQL:
-########    $> bash seed.sh <path_to_client_database> <pg_host> <pg_port> <pg_user>
+########    $> bash seed.sh <daemon_endpoint> <path_to_client_database> <pg_host> <pg_port> <pg_user>
 ########    - client_database: database keeping client's names, public keys (generally located at root project and named `database.db`),
 ########    - core_database: core database used by the libcore (SQLite and PostgreSQL are supported).
 ########    Usage Example :
@@ -32,11 +32,12 @@ logger () {
 }
 
 argc=$#
-client_database=$1
-core_database_path=$2
-pg_host=$2
-pg_port=$3
-pg_user=$4
+daemon_endpoint=$1
+client_database=$2
+core_database_path=$3
+pg_host=$3
+pg_port=$4
+pg_user=$5
 
 ###########################
 ######### Helpers #########
@@ -72,17 +73,17 @@ command_available () {
 
 # Check if databases are available
 database_available () {
-  [ "$argc" -lt 2 ] && abort_execution "Missing arguments: at least 2 arguments needed (with SQLite support)."
+  [ "$argc" -lt 3 ] && abort_execution "Missing arguments: at least 3 arguments needed (with SQLite support)."
   [ ! -f "$client_database" ] && abort_execution "Missing client database: '$client_database' do not exist."
 
-	if [ "$argc" -eq 2 ]; then
+	if [ "$argc" -eq 3 ]; then
 	  ### Sqlite
 	  [ ! -d "$core_database_path" ] && abort_execution "Missing core database: '$core_database_path' do not exist."
 	  mode=sqlite
 	else
 	  ### PostgreSQL
 	  command_available psql
-	  read -s -p "Enter PG server Password: " pg_pwd
+	  [ ! -f ~/.pgpass ] && abort_execution "Could not find '~/.pgpass'."
 	  mode=postgres
 	fi
 	return 1
@@ -98,8 +99,20 @@ logger "Seeding Wallet Daemon with $mode support ..."
 command_available python
 
 mkdir -p tmp
-logger "Generating JSON files that we will be used to recreate accounts ..."
-python3 tooling/database/sqllite/coredb-json-dump.py $core_database_path tmp
+
+if [ "$mode" == "sqlite" ]; then
+  logger "Using SQLite mode ..."
+  logger "Generating JSON files that we will be used to recreate accounts ..."
+  python3 tooling/database/sqllite/coredb-json-dump.py $core_database_path tmp
+else
+  logger "Using PostgreSQL mode ..."
+  params=`cat ~/.pgpass`
+  IFS=':'
+  read -ra pg_params <<< "$params" # str is read into an array as tokens separated by IFS
+  logger "Generating JSON files that we will be used to recreate accounts ..."
+  echo "python3 tooling/database/postgres/coredb-json-dump.py ${pg_params[0]} ${pg_params[1]} ${pg_params[2]} ${pg_params[3]} ${pg_params[4]} tmp"
+  python3 tooling/database/postgres/coredb-json-dump.py ${pg_params[0]} ${pg_params[1]} ${pg_params[2]}  ${pg_params[3]} ${pg_params[4]} tmp
+fi
 
 logger "Extracting clients public keys ..."
 python3 tooling/database/sqllite/extract-wd-pubkeys.py $client_database tmp seed
@@ -110,20 +123,23 @@ while IFS=$'\n' read -r line_data; do
   clients_data[i]="${line_data}"
   ((++i))
 done < tmp/clients
+
 [ $((${#clients_data[@]} % 2)) != 0 ] && abort_execution "Clients names and public keys should have equal size."
 
-if [ "$mode" == "sqlite" ]; then
-  for ((i=0;i<${#clients_data[@]}/2;i++))
+for ((i=0;i<${#clients_data[@]}/2;i++))
   do
         client_name=${clients_data[$((2*$i))]}
         client_pk="${clients_data[$((2*$i + 1))]}"
-
         client_file=`echo tmp/$client_name.json`
+
         [ ! -f $client_file ] && abort_execution "Missing client json file '$client_file'."
 
-        python3 tooling/request-gen.py --creation --sync --print http://localhost:8888 $client_file $client_pk $client_name
+        python3 tooling/request-gen.py --creation --sync --print "${daemon_endpoint}" $client_file $client_pk $client_name || abort_execution "Failed to generate '$client_file'."
+
+        client_name=""
+        client_pk=""
+        client_file=""
   done
-fi
 
 printf "\xF0\x9F\x9A\x80   Successfully reseeded Wallet Daemon !"
 
