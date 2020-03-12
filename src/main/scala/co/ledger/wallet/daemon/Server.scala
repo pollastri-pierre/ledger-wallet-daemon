@@ -32,7 +32,7 @@ router
   .filter[DemoUserAuthenticationFilter]
 
     if (DaemonConfiguration.isAuthenticationDisabled) {
-      router.filter[PublicKeyAutenticationFilter]
+      router.filter[PublicKeyAuthenticationFilter]
         .add[NoAuthenticationFilter, AccountsController]
         .add[NoAuthenticationFilter, CurrenciesController]
         .add[StatusController]
@@ -40,7 +40,7 @@ router
         .add[NoAuthenticationFilter, WalletsController]
         .add[NoAuthenticationFilter, TransactionsController]
     } else {
-      router.filter[LWDAutenticationFilter]
+      router.filter[LWDAuthenticationFilter]
         .add[AuthenticationFilter, AccountsController]
         .add[AuthenticationFilter, CurrenciesController]
         .add[StatusController]

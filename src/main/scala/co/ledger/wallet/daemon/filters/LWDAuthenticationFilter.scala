@@ -9,7 +9,7 @@ import com.twitter.finagle.http.{Request, Response}
 import com.twitter.finagle.{Service, SimpleFilter}
 import com.twitter.util.Future
 
-class LWDAutenticationFilter extends SimpleFilter[Request, Response] {
+class LWDAuthenticationFilter extends SimpleFilter[Request, Response] {
   private val AUTH_STRING_PATTERN = "([0-9a-fA-F]+):([0-9]+):([0-9a-fA-F]+)".r
   private val AUTHORIZATION_PREFIX: Int = 4
 
@@ -24,7 +24,7 @@ class LWDAutenticationFilter extends SimpleFilter[Request, Response] {
 
 }
 
-class PublicKeyAutenticationFilter extends SimpleFilter[Request, Response] {
+class PublicKeyAuthenticationFilter extends SimpleFilter[Request, Response] {
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
     val pubKeyHex = HexUtils.valueOf(request.headerMap.get("pubKey").get)
     AuthContextContext.setContext(request, AuthContext(pubKeyHex, new Date().getTime, pubKeyHex))
