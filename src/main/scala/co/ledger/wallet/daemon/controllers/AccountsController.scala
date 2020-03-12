@@ -152,9 +152,8 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
 
       // List of utxos available on this account
       get("/utxo") { request: UtxoAccountRequest =>
-        for {
-          utxoResponse <- accountsService.getUtxo(request.accountInfo, request.offset, request.batch)
-        } yield UtxoAccountResponse(utxoResponse._1, utxoResponse._2)
+        accountsService.getUtxo(request.accountInfo, request.offset, request.batch)
+          .map(utxoResponse => UtxoAccountResponse(utxoResponse._1, utxoResponse._2))
       }
 
       // List of tokens on this account
