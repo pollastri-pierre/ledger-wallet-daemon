@@ -63,6 +63,10 @@ object Account extends Logging {
       Account.getUtxo(offset, batch, a)
     }
 
+    def getUtxoCount(): Future[Int] = {
+      Account.getUtxoCount(a)
+    }
+
     def balance(implicit ec: ExecutionContext): Future[scala.BigInt] =
       Account.balance(a)
 
@@ -132,6 +136,10 @@ object Account extends Logging {
 
   def getUtxo(offset: Int, batch: Int, a: core.Account)(implicit ex: ExecutionContext): Future[List[co.ledger.core.BitcoinLikeOutput]] = {
     a.asBitcoinLikeAccount().getUTXO(offset, offset + batch).map(_.asScala.toList)
+  }
+
+  def getUtxoCount(a: core.Account): Future[Int] = {
+    a.asBitcoinLikeAccount().getUTXOCount()
   }
 
   def erc20Accounts(a: core.Account): Either[Exception, List[core.ERC20LikeAccount]] =

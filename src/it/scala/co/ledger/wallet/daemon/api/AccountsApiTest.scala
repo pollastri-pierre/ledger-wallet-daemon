@@ -3,7 +3,8 @@ package co.ledger.wallet.daemon.api
 import java.util.UUID
 
 import co.ledger.core.TimePeriod
-import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView, FreshAddressView, UTXOView}
+import co.ledger.wallet.daemon.controllers.AccountsController.UtxoAccountResponse
+import co.ledger.wallet.daemon.models.{AccountDerivationView, AccountView, FreshAddressView}
 import co.ledger.wallet.daemon.services.OperationQueryParams
 import co.ledger.wallet.daemon.utils.APIFeatureTest
 // import com.fasterxml.jackson.databind.JsonNode
@@ -71,10 +72,10 @@ class AccountsApiTest extends APIFeatureTest {
     createPool(poolName)
     assertWalletCreation(poolName, "account_wallet", "bitcoin", Status.Ok)
     assertCreateAccount(CORRECT_BODY, poolName, "account_wallet", Status.Ok)
-    val utxoList = parse[List[UTXOView]](assertGetUTXO(poolName, "account_wallet", index = 0, Status.Ok))
+    val utxoList = parse[UtxoAccountResponse](assertGetUTXO(poolName, "account_wallet", index = 0, Status.Ok))
     // FIXME : There is no UTXO on this account so the result is empty
-    // assert(utxoList.nonEmpty)
-    assert(utxoList.isEmpty)
+    assert(utxoList.utxos.isEmpty)
+    assert(0  === utxoList.count)
     deletePool(poolName)
   }
 

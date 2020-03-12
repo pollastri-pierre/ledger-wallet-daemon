@@ -12,7 +12,7 @@ import co.ledger.wallet.daemon.filters.AccountCreationContext._
 import co.ledger.wallet.daemon.filters.ExtendedAccountCreationContext._
 import co.ledger.wallet.daemon.filters.{AccountCreationFilter, AccountExtendedCreationFilter, DeprecatedRouteFilter}
 import co.ledger.wallet.daemon.models.Account._
-import co.ledger.wallet.daemon.models.TokenAccountInfo
+import co.ledger.wallet.daemon.models.{TokenAccountInfo, UTXOView}
 import co.ledger.wallet.daemon.services.{AccountsService, OperationQueryParams}
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
@@ -152,7 +152,9 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
 
       // List of utxos available on this account
       get("/utxo") { request: UtxoAccountRequest =>
-        accountsService.getUtxo(request.accountInfo, request.offset, request.batch)
+        for {
+          utxoResponse <- accountsService.getUtxo(request.accountInfo, request.offset, request.batch)
+        } yield UtxoAccountResponse(utxoResponse._1, utxoResponse._2)
       }
 
       // List of tokens on this account
@@ -279,6 +281,7 @@ object AccountsController {
                                 )
     extends BaseSingleAccountRequest with WithTokenAccountInfo
 
+  case class UtxoAccountResponse(utxos: List[UTXOView], count: Int)
   case class UtxoAccountRequest(
                                  @RouteParam pool_name: String,
                                  @RouteParam wallet_name: String,
