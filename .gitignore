@@ -26,3 +26,4 @@ src/main/resources/application.conf
 *.log
 
 core_data/
+tmp/
