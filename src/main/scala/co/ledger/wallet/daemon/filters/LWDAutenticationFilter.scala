@@ -3,7 +3,6 @@ package co.ledger.wallet.daemon.filters
 import java.nio.charset.StandardCharsets
 import java.util.{Base64, Date}
 
-import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.services.AuthenticationService.{AuthContext, AuthContextContext}
 import co.ledger.wallet.daemon.utils.HexUtils
 import com.twitter.finagle.http.{Request, Response}
@@ -15,18 +14,20 @@ class LWDAutenticationFilter extends SimpleFilter[Request, Response] {
   private val AUTHORIZATION_PREFIX: Int = 4
 
   override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
-    if (DaemonConfiguration.isAuthenticationDisabled) {
-      val pubKeyHex = HexUtils.valueOf(request.headerMap.get("pubKey").get)
-      AuthContextContext.setContext(request, AuthContext(pubKeyHex, new Date().getTime, pubKeyHex))
-      service(request)
-    } else {
-      request.headerMap.get("authorization").filter(_ contains "LWD") foreach {(string) =>
+    request.headerMap.get("authorization").filter(_ contains "LWD") foreach {(string) =>
         val auth = new String(Base64.getDecoder.decode(string.substring(AUTHORIZATION_PREFIX).getBytes(StandardCharsets.UTF_8)))
         val AUTH_STRING_PATTERN(pubKey, timestamp, signature) = auth
         AuthContextContext.setContext(request, AuthContext(HexUtils.valueOf(pubKey), timestamp.toLong, HexUtils.valueOf(signature)))
       }
-    }
     service(request)
   }
 
+}
+
+class PublicKeyAutenticationFilter extends SimpleFilter[Request, Response] {
+  override def apply(request: Request, service: Service[Request, Response]): Future[Response] = {
+    val pubKeyHex = HexUtils.valueOf(request.headerMap.get("pubKey").get)
+    AuthContextContext.setContext(request, AuthContext(pubKeyHex, new Date().getTime, pubKeyHex))
+    service(request)
+  }
 }
