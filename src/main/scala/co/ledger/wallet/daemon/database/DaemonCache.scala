@@ -43,6 +43,9 @@ trait DaemonCache {
   def getFreshAddresses(accountInfo: AccountInfo)(implicit ec: ExecutionContext): Future[Seq[FreshAddressView]] =
     withAccount(accountInfo)(_.freshAddresses).map(_.map(addr => FreshAddressView(addr.toString, addr.getDerivationPath)))
 
+  def getAddressesInRange(from: Long, to: Long, accountInfo: AccountInfo)(implicit ec: ExecutionContext): Future[Seq[FreshAddressView]] =
+    withAccount(accountInfo)(_.getAddressesInRange(from, to)).map(_.map(addr => FreshAddressView(addr.toString, addr.getDerivationPath)))
+
   def getAccountOperations(batch: Int, fullOp: Int, accountInfo: AccountInfo): Future[PackedOperationsView]
 
 

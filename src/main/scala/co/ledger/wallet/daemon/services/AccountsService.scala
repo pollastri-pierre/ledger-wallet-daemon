@@ -231,6 +231,10 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
     daemonCache.getFreshAddresses(accountInfo)
   }
 
+  def accountAddressesInRange(from: Long, to: Long, accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = {
+    daemonCache.getAddressesInRange(from, to, accountInfo)
+  }
+
   def accountDerivationPath(accountInfo: AccountInfo): Future[String] =
     daemonCache.withWallet(accountInfo.walletInfo)(_.accountDerivationPathInfo(accountInfo.accountIndex))
 

@@ -103,6 +103,9 @@ object Account extends Logging {
     def freshAddresses(implicit ec: ExecutionContext): Future[Seq[core.Address]] =
       Account.freshAddresses(a)
 
+    def getAddressesInRange(from: Long, to: Long)(implicit ec: ExecutionContext): Future[Seq[core.Address]] =
+      Account.getAddressesInRange(from, to, a)
+
     def sync(poolName: String, walletName: String)(implicit ec: ExecutionContext): Future[SynchronizationResult] =
       Account.sync(poolName, walletName, a)
 
@@ -384,6 +387,10 @@ object Account extends Logging {
 
   def freshAddresses(a: core.Account)(implicit ec: ExecutionContext): Future[Seq[core.Address]] = {
     a.getFreshPublicAddresses().map(_.asScala.toList)
+  }
+
+  def getAddressesInRange(from: Long, to: Long, a: core.Account)(implicit ec: ExecutionContext): Future[Seq[core.Address]] = {
+    a.asBitcoinLikeAccount.getAddresses(from, to).map(_.asScala.toList)
   }
 
   def sync(poolName: String, walletName: String, a: core.Account)(implicit ec: ExecutionContext): Future[SynchronizationResult] = {

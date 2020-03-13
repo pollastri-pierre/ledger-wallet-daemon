@@ -89,6 +89,12 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         accountsService.accountFreshAddresses(request.accountInfo)
       }
 
+      // End point queries for addresses by range with specified pool, wallet name and unique account index.
+      get("/addresses") { request: AccountAddressRequest =>
+        info(s"GET addresses in range $request")
+        accountsService.accountAddressesInRange(request.from, request.to, request.accountInfo)
+      }
+
       // End point queries for derivation path with specified pool, wallet name and unique account index.
       filter[DeprecatedRouteFilter].get("/path") { request: AccountRequest =>
         info(s"GET account derivation path $request")
@@ -261,6 +267,14 @@ object AccountsController {
                              @RouteParam override val pool_name: String,
                              @RouteParam override val wallet_name: String,
                              @RouteParam override val account_index: Int,
+                             request: Request) extends BaseSingleAccountRequest
+
+  case class AccountAddressRequest(
+                             @RouteParam override val pool_name: String,
+                             @RouteParam override val wallet_name: String,
+                             @RouteParam override val account_index: Int,
+                             @QueryParam from: Long = 0,
+                             @QueryParam to: Long = 1,
                              request: Request) extends BaseSingleAccountRequest
 
   case class AccountsRequest(
