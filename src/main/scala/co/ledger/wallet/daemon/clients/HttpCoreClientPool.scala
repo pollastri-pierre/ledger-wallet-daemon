@@ -22,10 +22,10 @@ class HttpCoreClientPool(val ec: ExecutionContext, client: ScalaHttpClientPool) 
   implicit val executionContext: ExecutionContext = ec
 
   override def execute(request: HttpRequest): Unit =
-    Future(Try(new URL(request.getUrl)).map(urlToHost))
+    Future(Try(new URL(request.getUrl)).map( url => (url, urlToHost(url))))
       .flatMap {
-        case Success(host) =>
-          val req: Request = Request(resolveMethod(request.getMethod), request.getUrl)
+        case Success((url, host)) =>
+          val req: Request = Request(resolveMethod(request.getMethod), url.getPath)
           req.headerMap.put("User-Agent", "ledger-lib-core")
           req.headerMap.put("Content-Type", "application/json")
           request.getHeaders.entrySet.forEach(hkv => req.headerMap.put(hkv.getKey, hkv.getValue))
@@ -71,7 +71,7 @@ class HttpCoreClientPool(val ec: ExecutionContext, client: ScalaHttpClientPool) 
         }
       } while (size > 0)
       val data = outputStream.getBytes
-      if (onError) info(s"Received ${new String(data)}")
+      if (onError) error(s"HTTP call is on error. Received content : (${resp.getContentString()}) ")
       new HttpReadBodyResult(null, data)
     } catch {
       case t: Throwable =>
