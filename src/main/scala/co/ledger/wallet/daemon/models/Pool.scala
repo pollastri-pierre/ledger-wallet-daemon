@@ -1,5 +1,7 @@
 package co.ledger.wallet.daemon.models
 
+import java.net.URL
+
 import co.ledger.core
 import co.ledger.core.implicits._
 import co.ledger.core.{ConfigurationDefaults, ErrorCode}
@@ -255,15 +257,13 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
             walletConfig.putString("BLOCKCHAIN_EXPLORER_VERSION", version)
           case _ =>
         }
-        path.host
+        new URL(s"${path.host}:${path.port}").toString
       case None => ConfigurationDefaults.BLOCKCHAIN_DEFAULT_API_ENDPOINT
     }
     walletConfig.putString("BLOCKCHAIN_EXPLORER_API_ENDPOINT", apiUrl)
     val wsUrl = DaemonConfiguration.explorer.ws.getOrElse(currencyName, DaemonConfiguration.explorer.ws("default"))
     walletConfig.putString("BLOCKCHAIN_OBSERVER_WS_ENDPOINT", wsUrl)
-
     walletConfig.putInt("RIPPLE_LAST_LEDGER_SEQUENCE_OFFSET", DaemonConfiguration.rippleLastLedgerSequenceOffset)
-
     walletConfig
   }
 }
