@@ -8,10 +8,11 @@ import co.ledger.core._
 import co.ledger.wallet.daemon.exceptions.InvalidUrlException
 import co.ledger.wallet.daemon.utils.Utils.RichTwitterFuture
 import com.sun.xml.internal.messaging.saaj.util.ByteOutputStream
-import com.twitter.finagle.http.{Method, Request, Response}
+import com.twitter.finagle.http.{Method, RequestBuilder, Response}
 import com.twitter.inject.Logging
 import com.twitter.io.Buf
 
+import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -21,22 +22,20 @@ class HttpCoreClientPool(val ec: ExecutionContext, client: ScalaHttpClientPool) 
 
   implicit val executionContext: ExecutionContext = ec
 
-  override def execute(request: HttpRequest): Unit =
-    Future(Try(new URL(request.getUrl)).map( url => (url, urlToHost(url))))
+  override def execute(httpCoreRequest: HttpRequest): Unit =
+    Future(Try(new URL(httpCoreRequest.getUrl)).map(url => (url, urlToHost(url))))
       .flatMap {
         case Success((url, host)) =>
-          val req: Request = Request(resolveMethod(request.getMethod), url.getPath)
-          req.headerMap.put("User-Agent", "ledger-lib-core")
-          req.headerMap.put("Content-Type", "application/json")
-          request.getHeaders.entrySet.forEach(hkv => req.headerMap.put(hkv.getKey, hkv.getValue))
-
-          if (request.getBody.nonEmpty) {
-            req.content(Buf.ByteArray.Owned(request.getBody))
-          }
+          val req = RequestBuilder()
+            .url(url)
+            .addHeader("User-Agent", "ledger-lib-core")
+            .addHeader("Content-Type", "application/json")
+            .addHeaders(httpCoreRequest.getHeaders.asScala.toMap)
+            .build(resolveMethod(httpCoreRequest.getMethod), content(httpCoreRequest))
 
           client.execute(host, req)
             .map { response =>
-              info(s"Core Http received from ${request.getUrl} status=${response.status.code} error=${isOnError(response.status.code)} " +
+              info(s"Core Http received from ${httpCoreRequest.getUrl} status=${response.status.code} error=${isOnError(response.status.code)} " +
                 s"- statusText=${response.status.reason}")
               new ScalaHttpUrlConnection(
                 response.status.code,
@@ -44,9 +43,13 @@ class HttpCoreClientPool(val ec: ExecutionContext, client: ScalaHttpClientPool) 
                 getResponseHeaders(response),
                 readResponseBody(response, isOnError(response.status.code)))
             }
-            .map(r => request.complete(r, null)).asScala()
-        case Failure(exception) => Future(request.complete(null, new Error(ErrorCode.HTTP_ERROR, s"Failed to parse url ${request.getUrl} => ${exception.getMessage}")))
+            .map(r => httpCoreRequest.complete(r, null)).asScala()
+        case Failure(exception) => Future(httpCoreRequest.complete(null, new Error(ErrorCode.HTTP_ERROR, s"Failed to parse url ${httpCoreRequest.getUrl} => ${exception.getMessage}")))
       }
+
+  private def content(coreRequest: HttpRequest): Option[Buf] =
+    if (coreRequest.getBody.nonEmpty) Some(Buf.ByteArray.Owned(coreRequest.getBody))
+    else None
 
   private def getResponseHeaders(response: Response) = {
     val headers = new util.HashMap[String, String]()
