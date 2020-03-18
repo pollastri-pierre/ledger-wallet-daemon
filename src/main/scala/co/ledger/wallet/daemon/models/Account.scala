@@ -390,7 +390,11 @@ object Account extends Logging {
   }
 
   def getAddressesInRange(from: Long, to: Long, a: core.Account)(implicit ec: ExecutionContext): Future[Seq[core.Address]] = {
-    a.asBitcoinLikeAccount.getAddresses(from, to).map(_.asScala.toList)
+    if (a.isInstanceOfBitcoinLikeAccount) {
+      a.asBitcoinLikeAccount.getAddresses(from, to).map(_.asScala.toList)
+    } else {
+      Future.failed(new UnsupportedOperationException(s"Account type ${a.getWalletType} not supported for get addresses in range."))
+    }
   }
 
   def sync(poolName: String, walletName: String, a: core.Account)(implicit ec: ExecutionContext): Future[SynchronizationResult] = {
