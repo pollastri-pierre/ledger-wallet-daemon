@@ -67,6 +67,15 @@ class AccountsApiTest extends APIFeatureTest {
     deletePool("fresh_addresses_pool")
   }
 
+  test("AccountsApi#Get addresses by range") {
+    createPool("account_pool")
+    assertWalletCreation("account_pool", "accounts_wallet", "bitcoin", Status.Ok)
+    assertCreateAccount(CORRECT_BODY, "account_pool", "accounts_wallet", Status.Ok)
+    val r = parse[Seq[FreshAddressView]](getAddresses("account_pool", "accounts_wallet", 0, 0, 1))
+    assert( r.size == 4)
+    deletePool("account_pool")
+  }
+
   test("AccountsApi#Get utxo from btc account") {
     val poolName = "getUtxo_pool"
     createPool(poolName)

@@ -12,7 +12,9 @@ import org.bitcoinj.core.Sha256Hash
 
 trait APIFeatureTest extends FeatureTest {
   override val server = new EmbeddedHttpServer(new ServerImpl)
+
   def defaultHeaders = lwdBasicAuthorisationHeader("whitelisted")
+
   def parse[A](response: Response)(implicit manifest: Manifest[A]): A = server.mapper.parse[A](response)
 
   def assertWalletCreation(poolName: String, walletName: String, currencyName: String, expected: Status): Response = {
@@ -36,6 +38,10 @@ trait APIFeatureTest extends FeatureTest {
 
   def createPool(poolName: String, expected: Status = Status.Ok): Response = {
     server.httpPost("/pools", s"""{"pool_name":"$poolName"}""", headers = defaultHeaders, andExpect = expected)
+  }
+
+  def getAddresses(poolName: String, walletName: String, account: Int, from: Int, to: Int, expected: Status = Status.Ok): Response = {
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$account/addresses?from=$from&to=$to", headers = defaultHeaders, andExpect = expected)
   }
 
   def deletePool(poolName: String): Response = {
