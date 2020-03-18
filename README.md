@@ -5,6 +5,15 @@
 [![Generic badge](https://img.shields.io/badge/Version-2.4.3-blue)](https://shields.io/)
 
 
+## Table of content :
+- [Run Integration Tests with coverage locally](#run-integration-tests-with-coverage-locally)
+- [Updating the libcore](#updating-the-libcore)
+- [Using Wallet Daemon with PostgreSQL](#using-wallet-daemon-with-postgresql)
+- [Run Dockerized Wallet Daemon](#run-dockerized-wallet-daemon)
+- [Integrate Wallet Daemon with Ledger Explorers Regtest](#integrate-wallet-daemon-with-ledger-explorers-regtest)
+
+
+---
 ## Run Integration Tests with coverage locally
  ```bash
 sbt clean coverage it:test coverageReport
@@ -12,6 +21,7 @@ sbt clean coverage it:test coverageReport
 
 Once generated, an html report can be found at `target/scala-2.12/scoverage-report/index.html`
 
+---
 ## Updating the libcore
 
 When a new version of the libcore is available, we need to update our bindings.
@@ -74,7 +84,7 @@ When a new version of the libcore is available, we need to update our bindings.
 
 7. Add a tag on the new commit with the version of the ledger-core-lib, or the commit
    hash if no version was tagged
-
+---
 ## Using Wallet Daemon with PostgreSQL
 
 ### Setup
@@ -107,14 +117,15 @@ We are supporting SSL connections.
 3. It is possible to set the connection pool size per wallet pool (e.g. by client) thanks to: 
 `PG_CONNECTION_POOL_SIZE_PER_WALLET_POOL`, which is equal to `2` by default and also a prefix name for every databases created by the libcore by setting `CORE_PG_DB_NAME_PREFIX` example : `CORE_PG_DB_NAME_PREFIX=WD_`
 
-### Run Dockerized Wallet Daemon locally with docker compose
+---
+## Run Dockerized Wallet Daemon
 Please have a look on  [Docker compose configuration file](docker-compose.yml) for more details on configuration. 
 This will create a PostgreSql instance with SSL enabled and the latest development image of wallet daemon ready to talk with.
 
 ```
 docker-compose up 
 ```
-
+---
 ## Integrate Wallet Daemon with Ledger Explorers Regtest 
 
 Wallet Daemon can be run fully offline by using paired with [Ledger Explorers Regtest Project](https://github.com/LedgerHQ/ledger-regtest-docker) 
@@ -124,7 +135,7 @@ instances ready to be queried by the Wallet Daemon.
 In order to use Wallet Daemon on top of it, you just need to configure the test coin explorer urls as following :  
 
 ### Customize configuration :
-Example for `BTC TESTNET` on a localhost Explorer instance exposing `http over `20000` port :   
+Example for `BTC TESTNET` on a localhost Explorer instance exposing `http` over `20000` port :   
 
  ```
 WALLET_BTC_TESTNET_EXPLORER_ENDPOINT="http://localhost"
@@ -134,16 +145,15 @@ WALLET_BTC_TESTNET_EXPLORER_VERSION=“v3"
 FEES_BTC_TESTNET_PATH="/blockchain/v3/btc_testnet/fees”
  ```
 
-
 ### Test Wallet Daemon Integration 
 
 #### Lets create a btc testnet account on top of Wallet Daemon
 
-First, if you are using *Postgres*, create the database corresponding to the pool name you want. Here we consider the pool name accounta :
+First, if you are using *Postgres*, create the database corresponding to the pool name you want. Here we consider the pool name **accounta** :
 
 **Create the pool :**
 
-`POST /pools`
+_Route_ `POST /pools`
 
 `{
     "pool_name": "accounta"
@@ -152,7 +162,7 @@ First, if you are using *Postgres*, create the database corresponding to the poo
 
 **Create a btc_regtest  wallet based on btc_testnet :** 
 
-`POST /pools/accounta/wallets`
+_Route_ `POST /pools/accounta/wallets`
 
 ```
 {
@@ -166,7 +176,7 @@ First, if you are using *Postgres*, create the database corresponding to the poo
 Example with extended public key as : 
 _tpubDAenfwNu5GyCJWv8oqRAckdKMSUoZjgVF5p8WvQwHQeXjDhAHmGrPa4a4y2Fn7HF2nfCLefJanHV3ny1UY25MRVogizB2zRUdAo7Tr9XAjm_
 
-`POST /pools/accounta/wallets/bitcoin_regtest/accounts/extended`
+_Route_ `POST /pools/accounta/wallets/bitcoin_regtest/accounts/extended`
 
 (Note the cointype is '1' into the derivation path)
 
@@ -187,9 +197,9 @@ _tpubDAenfwNu5GyCJWv8oqRAckdKMSUoZjgVF5p8WvQwHQeXjDhAHmGrPa4a4y2Fn7HF2nfCLefJanH
 
 Obviously you need to generate operations on derived addresses from extended key attached to your account 
 
-`POST /pools/accounta/wallets/bitcoin_regtest/accounts/1/operations/synchronize`
+_Route_ `POST /pools/accounta/wallets/bitcoin_regtest/accounts/1/operations/synchronize`
 
 **Retrieve operations of the account :** 
 
-`GET /pools/accounta/wallets/bitcoin_regtest/accounts/1/operations?full_op=1`
+_Route_ `GET /pools/accounta/wallets/bitcoin_regtest/accounts/1/operations?full_op=1`
 
