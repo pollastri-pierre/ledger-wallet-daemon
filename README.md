@@ -16,10 +16,10 @@ Once generated, an html report can be found at `target/scala-2.12/scoverage-repo
 
 When a new version of the libcore is available, we need to update our bindings.
 
-| Prerequisite                                   | Remarks |
-| ============================================== | ========================================= |
-| [docker](https://www.docker.com/get-started)   | Only needed if you plan to build in local |
-| [sbt](https://www.scala-sbt.org/download.html) |                                           |
+| Prerequisite                                   | Remarks                                      |
+| ---------------------------------------------: | :------------------------------------------: |
+| [docker](https://www.docker.com/get-started)   | Only needed if you plan to build in local    |
+| [sbt](https://www.scala-sbt.org/download.html) |                                              |
 
 1. Check out [lib core project](https://github.com/LedgerHQ/lib-ledger-core)
    ```bash
@@ -114,4 +114,82 @@ This will create a PostgreSql instance with SSL enabled and the latest developme
 ```
 docker-compose up 
 ```
+
+## Integrate Wallet Daemon with Ledger Explorers Regtest 
+
+Wallet Daemon can be run fully offline by using paired with [Ledger Explorers Regtest Project](https://github.com/LedgerHQ/ledger-regtest-docker) 
+which run locally all you need to create blockchain scenarios on local test node, start [Explorer and Indexer](https://github.com/LedgerHQ/blockchain-explorer)   
+instances ready to be queried by the Wallet Daemon.
+
+In order to use Wallet Daemon on top of it, you just need to configure the test coin explorer urls as following :  
+
+### Customize configuration :
+Example for `BTC TESTNET` on a localhost Explorer instance exposing `http over `20000` port :   
+
+ ```
+WALLET_BTC_TESTNET_EXPLORER_ENDPOINT="http://localhost"
+WALLET_BTC_TESTNET_EXPLORER_PORT=20000
+WALLET_BTC_TESTNET_EXPLORER_VERSION=“v3"
+
+FEES_BTC_TESTNET_PATH="/blockchain/v3/btc_testnet/fees”
+ ```
+
+
+### Test Wallet Daemon Integration 
+
+#### Lets create a btc testnet account on top of Wallet Daemon
+
+First, if you are using *Postgres*, create the database corresponding to the pool name you want. Here we consider the pool name accounta :
+
+**Create the pool :**
+
+`POST /pools`
+
+`{
+    "pool_name": "accounta"
+}
+`
+
+**Create a btc_regtest  wallet based on btc_testnet :** 
+
+`POST /pools/accounta/wallets`
+
+```
+{
+    "wallet_name": "bitcoin_regtest",
+    "currency_name": "bitcoin_testnet"
+}
+```
+
+**Create the account for my extended pub key (tpub as we are on btc_testnet)**
+
+Example with extended public key as : 
+_tpubDAenfwNu5GyCJWv8oqRAckdKMSUoZjgVF5p8WvQwHQeXjDhAHmGrPa4a4y2Fn7HF2nfCLefJanHV3ny1UY25MRVogizB2zRUdAo7Tr9XAjm_
+
+`POST /pools/accounta/wallets/bitcoin_regtest/accounts/extended`
+
+(Note the cointype is '1' into the derivation path)
+
+```
+{
+    "account_index": "0",
+    "derivations": [
+        {
+            "path": "44'/1'/0'",
+            "owner": "main",
+            "extended_key": "tpubDAenfwNu5GyCJWv8oqRAckdKMSUoZjgVF5p8WvQwHQeXjDhAHmGrPa4a4y2Fn7HF2nfCLefJanHV3ny1UY25MRVogizB2zRUdAo7Tr9XAjm"
+        }
+    ]
+}
+```
+
+**Synchronize my account (retrieve operations from explorer) :**
+
+Obviously you need to generate operations on derived addresses from extended key attached to your account 
+
+`POST /pools/accounta/wallets/bitcoin_regtest/accounts/1/operations/synchronize`
+
+**Retrieve operations of the account :** 
+
+`GET /pools/accounta/wallets/bitcoin_regtest/accounts/1/operations?full_op=1`
 
