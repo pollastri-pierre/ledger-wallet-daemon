@@ -116,6 +116,15 @@ explorer = {
         explorer_version = ${?WALLET_BTC_EXPLORER_VERSION}
        }
       {
+        currency = bitcoin_testnet
+        host = "https://api.ledgerwallet.com"
+        host = ${?WALLET_BTC_TESTNET_EXPLORER_ENDPOINT}
+        port = 443
+        port = ${?WALLET_BTC_TESTNET_EXPLORER_PORT}
+        explorer_version = "v3"
+        explorer_version = ${?WALLET_BTC_TESTNET_EXPLORER_VERSION}
+       }
+      {
         currency = ethereum
         host = "https://explorers.api.live.ledger.com"
         host = ${?WALLET_ETH_EXPLORER_ENDPOINT}
