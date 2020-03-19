@@ -108,6 +108,17 @@ explorer = {
         disable_sync_token = false
         disable_sync_token = ${?DEFAULT_DISABLE_SYNC_TOKEN}
       }
+     {
+        currency = bitcoin
+        host = "https://api.ledgerwallet.com"
+        host = ${?WALLET_BTC_EXPLORER_ENDPOINT}
+        port = 443
+        port = ${?WALLET_BTC_EXPLORER_PORT}
+        explorer_version = "v2"
+        explorer_version = ${?WALLET_BTC_EXPLORER_VERSION}
+        disable_sync_token = false
+        disable_sync_token = ${?BTC_DISABLE_SYNC_TOKEN}
+      }
       {
         currency = bitcoin_testnet
         host = "https://api.ledgerwallet.com"

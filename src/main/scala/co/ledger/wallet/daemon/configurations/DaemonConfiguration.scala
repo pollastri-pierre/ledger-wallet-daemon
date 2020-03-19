@@ -198,7 +198,8 @@ object DaemonConfiguration {
       val port = path.getInt("port")
       val fallback = Try(path.getString("fallback")).toOption
       val explorerVersion = Try(path.getString("explorer_version")).toOption
-      currency -> PathConfig(host, port, fallback, explorerVersion)
+      val disableSyncToken = Try(path.getBoolean("disable_sync_token")).getOrElse(false)
+      currency -> PathConfig(host, port, disableSyncToken, fallback, explorerVersion)
     }.toMap
 
     val fees = api.getConfigList("fees").asScala.toList.map { fee =>
@@ -225,11 +226,12 @@ object DaemonConfiguration {
 
   case class ApiConfig(fallbackTimeout: Int, paths: Map[String, PathConfig], fees: Map[String, FeesPath])
 
-  case class PathConfig(host: String, port: Int, fallback: Option[String], explorerVersion: Option[String]) {
+  case class PathConfig(host: String, port: Int, disableSyncToken: Boolean, fallback: Option[String], explorerVersion: Option[String]) {
     def filterPrefix: PathConfig = {
       PathConfig(
         host,
         port,
+        disableSyncToken,
         fallback,
         explorerVersion)
     }
