@@ -153,7 +153,7 @@ class AccountsApiTest extends APIFeatureTest {
   }
 
   test("AccountsApi#Create and Delete pool with wallet accounts") {
-    val poolName = "test_delete_pool"
+    val poolName = "delete_pool"
     val wallet1 = "account_deletePool_wal1"
     val wallet2 = "account_deletePool_wal2"
     val wallet3 = "account_deletePool_wal3"
