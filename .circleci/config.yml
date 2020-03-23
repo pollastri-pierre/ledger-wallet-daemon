@@ -53,14 +53,13 @@ jobs:
   integration_tests:
     docker:
       - image: ledgerhq/sbt-openjdk-8
-      - image: sameersbn/squid:3.5.27-2
+      - image: ledgerhq/walletdaemon-squid:3.5.27-2
       - image: postgres:11.6
         environment:
           POSTGRES_DB: postgres
           POSTGRES_USER: ledger
           POSTGRES_PASSWORD: ledger_secret
         command: -c "ssl=on" -c "ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key" -c "ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem"
-
     steps:
       - checkout
       - restore_cache: *dependencies_cache
