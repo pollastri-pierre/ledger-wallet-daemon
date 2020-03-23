@@ -51,7 +51,7 @@ class ScalaHttpClientTest extends AssertionsForJUnit with Logging {
     val bodyByte = Array.emptyByteArray
     val res = awaitExecution(url, bodyByte, HttpMethod.GET)
 
-    assert(res.isRight)
+    assert(res.isRight, () => res.left.get)
     val httpResult: HttpUrlConnection = res.right.get
     val body = new String(httpResult.readBody().getData)
     assert(httpResult.getStatusCode == 200, s"Status text is : ${httpResult.getStatusText} body is : $body")
@@ -87,7 +87,7 @@ class ScalaHttpClientTest extends AssertionsForJUnit with Logging {
     val http = "http"
     val cacheSizeStart = scalaService.poolCacheSize
     val hostName1 = "www.google.com"
-    val hostName2 = "www.yahoo.com"
+    val hostName2 = "www.ledger.com"
     val url1 = s"https://$hostName1?aaa=bbb"
     val host1 = ScalaHttpClientPool.Host(hostName1, https, 443)
     // Same host different params
@@ -145,7 +145,10 @@ class ScalaHttpClientTest extends AssertionsForJUnit with Logging {
     val req = new HttpRequestT(url, httpMethod, Map[String, String]("User-Agent" -> "ledger-lib-core", "Content-Type" -> "application/json"), bodyByte, lock, resultHolder)
     service.execute(req)
     lock.await(timeoutMs, TimeUnit.MILLISECONDS)
-    resultHolder.get()
+    Option(resultHolder.get)
+      .getOrElse(Left(new co.ledger.core.Error(
+        co.ledger.core.ErrorCode.HTTP_TIMEOUT,
+        s"Failed to execute request due to timeout : $timeoutMs ms")))
   }
 
   @Test
