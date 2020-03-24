@@ -7,7 +7,8 @@ import javax.inject.{Inject, Singleton}
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.database.DefaultDaemonCache.User
-import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext, UserNotFoundException}
+import co.ledger.wallet.daemon.exceptions.UserNotFoundException
+import co.ledger.wallet.daemon.services.AuthenticationService.{AuthenticationFailedException, AuthentifiedUserContext}
 import co.ledger.wallet.daemon.utils.HexUtils
 import co.ledger.wallet.daemon.utils.Utils._
 import com.twitter.finagle.http.Request
@@ -37,9 +38,10 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
   private def attemptAuthorize(request: Request)(implicit ec: ExecutionContext): Future[Unit] = {
     try {
       val pubKey = request.authContext.pubKey
-      daemonCache.getUser(HexUtils.valueOf(pubKey)) map {
+      val pubKeyAsString = HexUtils.valueOf(pubKey)
+      daemonCache.getUser(pubKeyAsString) map {
         case None =>
-          throw UserNotFoundException()
+          throw UserNotFoundException(pubKeyAsString)
         case Some(user) =>
           val loginAtAsLong = request.authContext.time
           val loginAt = new Date(loginAtAsLong * 1000)
@@ -64,7 +66,6 @@ class AuthenticationService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAServ
 object AuthenticationService {
 
   case class AuthenticationFailedException(msg: String) extends Exception(msg)
-  case class UserNotFoundException() extends Exception("User doesn't exist")
   case class AuthContext(pubKey: Array[Byte], time: Long, signedMessage: Array[Byte])
   object AuthContextContext {
     private val AuthContextField = Request.Schema.newField[AuthContext]()

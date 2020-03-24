@@ -171,7 +171,7 @@ object Account extends Logging {
       erc20Ops.filter(erc20Op => {
         val opFound = hashToCoreOps.contains(erc20Op.getHash)
         if (!opFound) {
-          warn(s"Requested operation ${erc20Op.getHash} from account ${a.getAddress} has been skipped due to inconsistencies.")
+          error(s"Requested operation ${erc20Op.getHash} from account ${a.getAddress} has been skipped due to inconsistencies.")
         }
         opFound
       }
