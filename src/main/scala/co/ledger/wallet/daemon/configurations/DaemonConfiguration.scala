@@ -139,28 +139,28 @@ object DaemonConfiguration extends Logging{
 
   // The expire time in minutes of the balance per account
   val balanceCacheTtlMin: Int =
-    if (config.hasPath("balance.cache.ttl_min")) {
-      config.getInt("balance.cache.ttl_min")
+    if (config.hasPath("caching.balance.ttl_minute")) {
+      config.getInt("caching.balance.ttl_minute")
     }
     else {
       1
     }
 
-  // The core pool operation size
-  val corePoolOpSizeFactor: Int =
-    if (config.hasPath("core.ops_threads_factor")) {
-      config.getInt("core.ops_threads_factor")
-    }
-    else DEFAULT_CORE_POOL_THREADS_FACTOR
-
   // The maximum size of pagination token cache
   val balanceCacheMaxSize: Long =
-    if (config.hasPath("balance.cache.max_size")) {
-      config.getInt("balance.cache.max_size")
+    if (config.hasPath("caching.balance.max_size")) {
+      config.getInt("caching.balance.max_size")
     }
     else {
       1000
     }
+
+  // The core pool operation size
+  val corePoolOpSizeFactor: Int =
+  if (config.hasPath("core.ops_threads_factor")) {
+      config.getInt("core.ops_threads_factor")
+    }
+  else DEFAULT_CORE_POOL_THREADS_FACTOR
 
   val isPrintCoreLibLogsEnabled: Boolean = config.hasPath("debug.print_core_logs") && config.getBoolean("debug.print_core_logs")
 

@@ -95,6 +95,14 @@ core_data_path = "core_data"
 update_wallet_config = false
 update_wallet_config = ${?WALLET_UPDATE_WALLET_CONFIG}
 
+caching = {
+    balance = {
+        ttl_minute = 1
+        ttl_minute = ${?BALANCE_CACHE_TTL_MIN}
+        max_size = 1000
+        max_size = ${?BALANCE_MAX_SIZE}
+    }
+}
 explorer = {
   api = {
     connection_pool_size = 50
