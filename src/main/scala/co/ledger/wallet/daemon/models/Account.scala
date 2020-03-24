@@ -168,7 +168,14 @@ object Account extends Logging {
     a.queryOperations().complete().execute().map(_.asScala.toList).map { coreOps =>
       val hashToCoreOps = coreOps.map(coreOp => coreOp.asEthereumLikeOperation().getTransaction.getHash -> coreOp).toMap
       val erc20Ops = a.getOperations.asScala.toList
-      erc20Ops.map(erc20Op => (hashToCoreOps(erc20Op.getHash), erc20Op))
+      erc20Ops.filter(erc20Op => {
+        val opFound = hashToCoreOps.contains(erc20Op.getHash)
+        if (!opFound) {
+          warn(s"Requested operation ${erc20Op.getHash} from account ${a.getAddress} has been skipped due to inconsistencies.")
+        }
+        opFound
+      }
+      ).map(erc20Op => (hashToCoreOps(erc20Op.getHash), erc20Op))
     }
 
   def batchedErc20Operations(contract: String, a: core.Account, offset: Long, batch: Int)(implicit ec: ExecutionContext): Future[List[(core.Operation, core.ERC20LikeOperation)]] =
