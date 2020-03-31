@@ -23,7 +23,10 @@ class StatusController extends Controller {
 
   get("/_version") { request: Request =>
     info(s"GET _version $request")
-    response.ok(VersionResponse(BuildInfo.name, BuildInfo.commitHash, LedgerCore.getStringVersion, DaemonConfiguration.explorer))
+    response.ok(
+      VersionResponse(
+        BuildInfo.name, BuildInfo.version, BuildInfo.scalaVersion,
+        BuildInfo.commitHash.getOrElse("unknown"), LedgerCore.getStringVersion, DaemonConfiguration.explorer))
   }
 
   get("/_metrics") { request: Request =>
@@ -40,7 +43,7 @@ object StatusController {
 
   case class Status(engine_version: String, status: String = "OK")
 
-  case class VersionResponse(name: String, commitHash: String, libcore: String, explorers: DaemonConfiguration.ExplorerConfig)
+  case class VersionResponse(name: String, version: String, scalaVersion: String, commitHash: String, libcoreVersion: String, explorers: DaemonConfiguration.ExplorerConfig)
 
   case class MetricsResponse(coreHttpCachedPool: Long, feesHttpCachedPool: Long, fallbackHttpCachedPool: Long)
 

@@ -1,10 +1,18 @@
-name := "daemon"
-
-version := "0.0.0"
-
+name := "wallet-daemon"
+version := "2.6.1-SNAPSHOT"
 organization := "co.ledger"
-
 scalaVersion := "2.12.10"
+buildInfoPackage := "co.ledger.wallet.daemon"
+
+// Add the branch name to the sbt prompt
+enablePlugins(GitBranchPrompt)
+enablePlugins(GitVersioning)
+
+lazy val buildInfoKeysInfo = Seq[BuildInfoKey](
+  name,
+  version,
+  scalaVersion)
+
 
 addCompilerPlugin("org.psywerx.hairyfotr" %% "linter" % "0.1.17")
 
@@ -96,17 +104,15 @@ lazy val versions = new {
   val tyrus      = "1.13.1"
   val websocket  = "1.1"
   val web3j      = "4.5.1"
-  val guava = "28.1-jre"
+  val guava      = "28.1-jre"
 }
 // scalastyle:on
 
 lazy val root = (project in file("."))
-  .enablePlugins(BuildInfoPlugin)
+  .enablePlugins(BuildInfoPlugin).settings(buildInfoKeys := buildInfoKeysInfo, buildInfoKeys ++= Seq[BuildInfoKey]("commitHash" -> git.gitHeadCommit.value))
   .configs(IntegrationTest)
   .settings(
     Defaults.itSettings,
-    buildInfoKeys := Seq[BuildInfoKey](version, git.gitHeadCommit),
-    buildInfoPackage := "buildinfo",
     libraryDependencies ++= Seq(
       "io.github.andrebeat"          %% "scala-pool"             % versions.andrebeat,
       "org.bitcoinj"                 %  "bitcoinj-core"          % versions.bitcoinj,
@@ -155,13 +161,3 @@ libraryDependencies ++= Seq(
   compilerPlugin("com.github.ghik" %% "silencer-plugin" % "1.3.1"),
   "com.github.ghik" %% "silencer-lib" % "1.3.1" % Provided
 )
-
-// For sbt plugin sbt-buildinfo
-enablePlugins(BuildInfoPlugin)
-
-buildInfoKeys := Seq[BuildInfoKey](
-  name,
-  version,
-  "commitHash" -> sys.env.getOrElse("COMMIT_HASH", "unknown-commit-hash"))
-
-buildInfoPackage := "co.ledger.wallet.daemon"
