@@ -2,7 +2,7 @@
 
 [![CircleCI](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon.svg?style=shield)](https://circleci.com/gh/LedgerHQ/ledger-wallet-daemon)
 [![codecov](https://codecov.io/gh/LedgerHQ/ledger-wallet-daemon/branch/develop/graph/badge.svg)](https://codecov.io/gh/LedgerHQ/ledger-wallet-daemon)
-[![Generic badge](https://img.shields.io/badge/Version-2.4.3-blue)](https://shields.io/)
+[![Generic badge](https://img.shields.io/badge/Version-2.6.0-blue)](https://shields.io/)
 
 
 ## Table of content :
