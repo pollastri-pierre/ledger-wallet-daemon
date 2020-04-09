@@ -1,8 +1,7 @@
 package co.ledger.wallet.daemon.clients
 
-import java.net.URL
-
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
+import co.ledger.wallet.daemon.utils.NetUtils.Host
 import co.ledger.wallet.daemon.utils.Utils
 import com.google.common.cache.{CacheBuilder, CacheLoader, LoadingCache, RemovalNotification}
 import com.twitter.finagle.http.{Request, Response}
@@ -41,20 +40,16 @@ class ScalaHttpClientPool extends Logging {
 
   def execute(host: Host, request: Request): com.twitter.util.Future[Response] =
     connectionPools.get(host)(request).map(response => {
-        info(s"Received from ${request.host.getOrElse("No host")} - ${request.uri} status=${response.status.code} " +
-          s"error=${isOnError(response.status.code)} - statusText=${response.status.reason} - " +
-          s"Request : $request - (Payload : ${Utils.preview(request.getContentString(), 200)}) - " +
-          s"Response : $response - (Payload : ${Utils.preview(response.getContentString(), 200)})")
+      info(s"Received from ${request.host.getOrElse("No host")} - ${request.uri} status=${response.status.code} " +
+        s"error=${isOnError(response.status.code)} - statusText=${response.status.reason} - " +
+        s"Request : $request - (Payload : ${Utils.preview(request.getContentString(), 200)}) - " +
+        s"Response : $response - (Payload : ${Utils.preview(response.getContentString(), 200)})")
       response
     }).onFailure(th => error(s"Failed to execute request on host $host with request $request. Error message : ${th.getMessage}", th))
 }
 
-object ScalaHttpClientPool {
+object ScalaHttpClientPool extends Logging {
   val PROXY_BUFFER_SIZE: Int = 4 * 4096
-  val HTTP_DEFAULT_PORT: Int = 80
-  val HTTPS_DEFAULT_PORT: Int = 443
-
-  case class Host(hostName: String, protocol: String, port: Int)
 
   private val budget: RetryBudget = RetryBudget(
     ttl = Duration.fromSeconds(DaemonConfiguration.explorer.client.retryTtl),
@@ -71,7 +66,8 @@ object ScalaHttpClientPool {
     .withSessionPool.ttl(Duration.fromSeconds(DaemonConfiguration.explorer.client.connectionTtl))
 
   def serviceFor(host: Host): Either[Throwable, Service[Request, Response]] = {
-    Try(DaemonConfiguration.proxy match {
+
+    Try(proxyFor(host) match {
       case Some(proxy) => tls(host, client).withTransport.httpProxyTo(s"${host.hostName}:${host.port}")
         .newService(s"${proxy.host}:${proxy.port}")
       case None => tls(host, client).newService(s"${host.hostName}:${host.port}")
@@ -84,17 +80,17 @@ object ScalaHttpClientPool {
       case _ => client
     }
 
-  def resolvePort(url: URL): Int = url.getPort match {
-    case port if port > 0 => port
-    case _ => url.getProtocol match {
-      case "https" => HTTPS_DEFAULT_PORT
-      case _ => HTTP_DEFAULT_PORT
-    }
-  }
 
   def isOnError(statusCode: Int): Boolean = {
     !(statusCode >= 200 && statusCode < 400)
   }
 
-  def urlToHost(url: URL): Host = Host(url.getHost, url.getProtocol, resolvePort(url))
+  def proxyFor(host: Host): Option[DaemonConfiguration.Proxy] = {
+    DaemonConfiguration.explorer.api.proxyUse.get(host) match {
+      case Some(false) =>
+        info(s"No proxy for $host")
+        None
+      case _ => DaemonConfiguration.proxy
+    }
+  }
 }

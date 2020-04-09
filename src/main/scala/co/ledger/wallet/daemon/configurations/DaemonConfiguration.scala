@@ -1,7 +1,10 @@
 package co.ledger.wallet.daemon.configurations
 
+import java.net.URL
 import java.util.Locale
 
+import co.ledger.wallet.daemon.utils.NetUtils
+import co.ledger.wallet.daemon.utils.NetUtils.Host
 import com.twitter.inject.Logging
 import com.typesafe.config.ConfigFactory
 import slick.jdbc.JdbcProfile
@@ -10,7 +13,7 @@ import scala.collection.JavaConverters._
 import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
-object DaemonConfiguration extends Logging{
+object DaemonConfiguration extends Logging {
   private val config = ConfigFactory.load()
   private val PERMISSION_CREATE_USER: Int = 0x01
   private val DEFAULT_AUTH_TOKEN_DURATION: Int = 3600 * 1000 // 30 seconds
@@ -96,7 +99,7 @@ object DaemonConfiguration extends Logging{
   }
 
   val isWhiteListDisabled: Boolean = if (!config.hasPath("disable_whitelist")) false else config.getBoolean("disable_whitelist")
-   val isAuthenticationDisabled: Boolean = Try(config.getBoolean("authentication.disable")).getOrElse(false)
+  val isAuthenticationDisabled: Boolean = Try(config.getBoolean("authentication.disable")).getOrElse(false)
 
   val updateWalletConfig: Boolean = if (config.hasPath("update_wallet_config")) config.getBoolean("update_wallet_config") else false
 
@@ -161,10 +164,10 @@ object DaemonConfiguration extends Logging{
 
   // The core pool operation size
   val corePoolOpSizeFactor: Int =
-  if (config.hasPath("core.ops_threads_factor")) {
+    if (config.hasPath("core.ops_threads_factor")) {
       config.getInt("core.ops_threads_factor")
     }
-  else DEFAULT_CORE_POOL_THREADS_FACTOR
+    else DEFAULT_CORE_POOL_THREADS_FACTOR
 
   val isPrintCoreLibLogsEnabled: Boolean = config.hasPath("debug.print_core_logs") && config.getBoolean("debug.print_core_logs")
 
@@ -210,6 +213,15 @@ object DaemonConfiguration extends Logging{
       currency -> PathConfig(host, port, disableSyncToken, fallback, explorerVersion)
     }.toMap
 
+    val proxyUseMap = api.getConfigList("paths").asScala.toList.map { path =>
+      val host = path.getString("host").trim
+      val port = path.getInt("port")
+      val url = new URL(s"$host:$port")
+      // Use proxy if proxy is enabled globally and proxyuse is true or undefined
+      val proxyUse = Try(path.getBoolean("proxyuse")).getOrElse(true) && proxy.isDefined
+      NetUtils.urlToHost(url) -> proxyUse
+    }.toMap
+
     val fees = api.getConfigList("fees").asScala.toList.map { fee =>
       val currency = fee.getString("currency")
       val path = fee.getString("path")
@@ -219,7 +231,7 @@ object DaemonConfiguration extends Logging{
 
     val ws = explorer.getObject("ws").unwrapped().asScala.toMap.mapValues(_.toString)
     ExplorerConfig(
-      ApiConfig(fallbackTimeout, paths, fees),
+      ApiConfig(fallbackTimeout, paths, proxyUseMap, fees),
       ClientConnectionConfig(connectionPoolSize, retryBackoffDelta, connectionPoolTtl, retryTtl, retryMin, retryPercent), ws)
   }
 
@@ -232,18 +244,9 @@ object DaemonConfiguration extends Logging{
     }
   }
 
-  case class ApiConfig(fallbackTimeout: Int, paths: Map[String, PathConfig], fees: Map[String, FeesPath])
+  case class ApiConfig(fallbackTimeout: Int, paths: Map[String, PathConfig], proxyUse: Map[Host, Boolean], fees: Map[String, FeesPath])
 
-  case class PathConfig(host: String, port: Int, disableSyncToken: Boolean, fallback: Option[String], explorerVersion: Option[String]) {
-    def filterPrefix: PathConfig = {
-      PathConfig(
-        host,
-        port,
-        disableSyncToken,
-        fallback,
-        explorerVersion)
-    }
-  }
+  case class PathConfig(host: String, port: Int, disableSyncToken: Boolean, fallback: Option[String], explorerVersion: Option[String])
 
   case class ClientConnectionConfig(connectionPoolSize: Int, // Maximum concurrent connection inside a connection pool
                                     retryBackoff: Int, // In millis

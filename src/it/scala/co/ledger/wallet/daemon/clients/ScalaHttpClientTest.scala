@@ -6,6 +6,7 @@ import java.util.concurrent.{CountDownLatch, Executors, TimeUnit}
 
 import co.ledger.core
 import co.ledger.core.{HttpMethod, HttpRequest, HttpUrlConnection}
+import co.ledger.wallet.daemon.utils.NetUtils
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
@@ -89,21 +90,21 @@ class ScalaHttpClientTest extends AssertionsForJUnit with Logging {
     val hostName1 = "www.google.com"
     val hostName2 = "www.ledger.com"
     val url1 = s"https://$hostName1?aaa=bbb"
-    val host1 = ScalaHttpClientPool.Host(hostName1, https, 443)
+    val host1 = NetUtils.Host(hostName1, https, 443)
     // Same host different params
     val url2 = s"https://$hostName1?aaa=bbb&bbb=ccc"
     // Same host different protocol
     val url3 = s"http://$hostName1?aaa=bbb&bbb=ccc"
-    val host3 = ScalaHttpClientPool.Host(hostName1, http, 80)
+    val host3 = NetUtils.Host(hostName1, http, 80)
 
     // Same params different host
     val url4 = s"https://$hostName2?aaa=bbb&bbb=ccc"
-    val host4 = ScalaHttpClientPool.Host(hostName2, https, 443)
+    val host4 = NetUtils.Host(hostName2, https, 443)
 
     // Same host but port is different
     val portHost2 = 8080
     val url5 = s"https://$hostName2:$portHost2?aaa=bbb&bbb=ccc"
-    val host5 = ScalaHttpClientPool.Host(hostName2, https, portHost2)
+    val host5 = NetUtils.Host(hostName2, https, portHost2)
 
     // Check hosts are not known
     assert(!scalaService.isHostCached(host1))

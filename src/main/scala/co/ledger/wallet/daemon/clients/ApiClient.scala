@@ -5,7 +5,7 @@ import java.net.URL
 import co.ledger.core
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.models.FeeMethod
-import co.ledger.wallet.daemon.utils.HexUtils
+import co.ledger.wallet.daemon.utils.{HexUtils, NetUtils}
 import co.ledger.wallet.daemon.utils.Utils._
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.finagle.http.{Method, Request}
@@ -26,7 +26,7 @@ class ApiClient(implicit val ec: ExecutionContext) extends Logging {
 
   case class CurrencyServiceURL(url: URL, fallback: Option[URL])
 
-  private implicit def urlToHost(url: URL): ScalaHttpClientPool.Host = ScalaHttpClientPool.urlToHost(url)
+  private implicit def urlToHost(url: URL): NetUtils.Host = NetUtils.urlToHost(url)
 
   private val currencyServiceUrl: Map[String, CurrencyServiceURL] = DaemonConfiguration.explorer.api.paths.map { case (currency, path) => currency ->
     CurrencyServiceURL(new URL(s"${path.host}:${path.port}"), path.fallback.map(new URL(_)))

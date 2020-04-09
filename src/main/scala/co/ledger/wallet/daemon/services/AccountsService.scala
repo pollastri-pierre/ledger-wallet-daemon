@@ -22,7 +22,7 @@ import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperation
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
-import co.ledger.wallet.daemon.utils.Utils
+import co.ledger.wallet.daemon.utils.{NetUtils, Utils}
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.twitter.finagle.http.{Method, Request, Response}
@@ -138,7 +138,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
             val request = Request(Method.Post, url.getPath).host(url.getHost)
             request.setContentString(body)
             request.setContentType("application/json")
-            val fut: Future[Response] = service.execute(ScalaHttpClientPool.urlToHost(url), request).asScala()
+            val fut: Future[Response] = service.execute(NetUtils.urlToHost(url), request).asScala()
             fut.onComplete {
               case Success(v) => info(s"Successfully retrieve json response from provider : $v")
               case Failure(t) => error("Unable to fetch from fallback provider", t)

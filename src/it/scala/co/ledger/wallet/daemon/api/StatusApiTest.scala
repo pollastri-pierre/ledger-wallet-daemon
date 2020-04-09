@@ -2,9 +2,20 @@ package co.ledger.wallet.daemon.api
 
 import co.ledger.wallet.daemon.controllers.StatusController.VersionResponse
 import co.ledger.wallet.daemon.utils.APIFeatureTest
+import co.ledger.wallet.daemon.utils.NetUtils.Host
+import com.fasterxml.jackson.core.JsonParser
+import com.fasterxml.jackson.databind.module.SimpleModule
+import com.fasterxml.jackson.databind.{DeserializationContext, JsonDeserializer, ObjectMapper}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import com.fasterxml.jackson.module.scala.experimental.ScalaObjectMapper
 import com.twitter.finagle.http.Status
 
 class StatusApiTest extends APIFeatureTest {
+
+  val module: SimpleModule = new SimpleModule
+  module.addDeserializer(classOf[Map[Host, Boolean]], new HostDeserializer)
+  server.mapper.registerModule(module)
+
   test("_version endpoint is returning buildinfo") {
     val versionResponse = parse[VersionResponse](server.httpGet("/_version", headers = defaultHeaders, andExpect = Status.Ok))
     assert(isValidVersion(versionResponse.libcoreVersion), versionResponse.libcoreVersion)
@@ -21,7 +32,7 @@ class StatusApiTest extends APIFeatureTest {
     assert(!isValidVersion("0.0.0"))
     assert(!isValidVersion(""))
   }
-  
+
   test("is valid sha checker") {
     assert(isValidSHA("dc0a1b846b1aba65989704f194fdfb5f3e8a8a22"))
     assert(!isValidSHA("unknown"))
@@ -37,4 +48,14 @@ class StatusApiTest extends APIFeatureTest {
   def isValidSHA(sha: String): Boolean = {
     sha.matches("[a-fA-F0-9]{40}")
   }
+
+  class HostDeserializer extends JsonDeserializer[Map[Host, Boolean]] {
+    private val mapper: ObjectMapper = new ObjectMapper() with ScalaObjectMapper
+    mapper.registerModule(DefaultScalaModule)
+
+    override def deserialize(jp: JsonParser, ctxt: DeserializationContext): Map[Host, Boolean] = {
+      Map(Host("host", "protoc", 1234) -> true)
+    }
+  }
+
 }
