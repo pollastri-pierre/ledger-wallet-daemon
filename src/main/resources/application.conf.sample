@@ -92,7 +92,7 @@ disable_whitelist = true
 
 core_data_path = "core_data"
 
-update_wallet_config = false
+update_wallet_config = true
 update_wallet_config = ${?WALLET_UPDATE_WALLET_CONFIG}
 
 caching = {
