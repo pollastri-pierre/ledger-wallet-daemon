@@ -21,6 +21,9 @@ import com.twitter.finatra.validation.{MethodValidation, ValidationResult}
 import javax.inject.Inject
 
 import scala.concurrent.Future
+import java.time.Instant
+import java.time.Period
+import java.time.ZoneId
 
 class AccountsController @Inject()(accountsService: AccountsService) extends Controller {
 
@@ -242,9 +245,48 @@ object AccountsController {
     def endDate: Date = DATE_FORMATTER.parse(end)
 
     @MethodValidation
-    def validateDate: ValidationResult = CommonMethodValidations.validateDates(start, end)
+    def validateDate: ValidationResult = {
+      val validateDateFormat = CommonMethodValidations.validateDates(start, end)
+      if(validateDateFormat.isValid) {
+        val validateTP = validateTimePeriod
+        if(validateTP.isValid) {
+          validatePeriodSize
+        } else {
+          validateTP
+        }
+      } else {
+        validateDateFormat
+      }
+    }
 
-    @MethodValidation
+    def validatePeriodSize: ValidationResult = {
+      val startLocalDate = Instant.ofEpochMilli(startDate.getTime()).atZone(ZoneId.systemDefault()).toLocalDate()
+      val endLocalDate = Instant.ofEpochMilli(endDate.getTime()).atZone(ZoneId.systemDefault()).toLocalDate()
+      val period = Period.between(startLocalDate, endLocalDate)
+      timePeriod match {
+      case TimePeriod.HOUR =>
+        ValidationResult.validate(
+          period.minusMonths(1).isNegative(),
+          "can't return hourly history for period more than one month"
+        )
+      case TimePeriod.DAY =>
+        ValidationResult.validate(
+          period.minusYears(3).isNegative(),
+          "can't return daily history for period more than three years"
+        )
+      case TimePeriod.WEEK =>
+        ValidationResult.validate(
+          period.minusYears(10).isNegative(),
+          "can't return weekly history for period more than ten years"
+        )
+      case TimePeriod.MONTH =>
+        ValidationResult.validate(
+          period.minusYears(100).isNegative(),
+          "can't return monthly history for period more than one hundred years"
+        )
+      }
+    }
+
     def validateTimePeriod: ValidationResult = CommonMethodValidations.validateTimePeriod(timeInterval)
   }
 

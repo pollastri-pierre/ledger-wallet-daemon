@@ -28,6 +28,14 @@ class AccountsApiTest extends APIFeatureTest {
     history("balance_pool", "account_wallet", 0, "2017-10-12T13:38:23Z", "2018-10-12", TimePeriod.DAY.toString, Status.BadRequest)
     history("balance_pool", "account_wallet", 0, "2017-10-12T13:38:23Z", "2018-10-12T13:38:23Z", "TIME", Status.BadRequest)
     history("balance_pool", "account_wallet", 0, "2018-11-12T13:38:23Z", "2018-10-12T13:38:23Z", TimePeriod.DAY.toString, Status.BadRequest)
+    // test if period too long
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2015-13-12T00:00:00Z", TimePeriod.HOUR.toString, Status.BadRequest)
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2015-13-12T00:00:00Z", TimePeriod.DAY.toString, Status.Ok)
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2019-10-12T00:00:00Z", TimePeriod.DAY.toString, Status.BadRequest)
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2019-10-12T00:00:00Z", TimePeriod.WEEK.toString, Status.Ok)
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2029-10-12T00:00:00Z", TimePeriod.WEEK.toString, Status.BadRequest)
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2029-10-12T00:00:00Z", TimePeriod.MONTH.toString, Status.Ok)
+    history("balance_pool", "account_wallet", 0, "2015-11-12T00:00:00Z", "2219-10-12T00:00:00Z", TimePeriod.MONTH.toString, Status.BadRequest)
     deletePool("balance_pool")
   }
 
