@@ -1,13 +1,14 @@
 package co.ledger.wallet.daemon.database
 
 import java.util.UUID
-import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicInteger
 
 import co.ledger.wallet.daemon.exceptions.OperationNotFoundException
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import com.twitter.inject.Logging
 import javax.inject.Singleton
 import java.util.concurrent.ConcurrentHashMap
+
 import scala.collection.JavaConverters._
 import java.time.Duration
 
@@ -45,13 +46,13 @@ class OperationCache extends Logging {
                        poolId: Long,
                        walletName: String,
                        accountIndex: Int,
-                       offset: Long,
+                       offset: Int,
                        batch: Int,
                        next: Option[UUID],
                        previous: Option[UUID]): AtomicRecord = {
     if (cache.contains(id)) { cache(id) }
     else {
-      val newRecord = new AtomicRecord(id, poolId, Option(walletName), Option(accountIndex), batch, new AtomicLong(offset), next, previous)
+      val newRecord = new AtomicRecord(id, poolId, Option(walletName), Option(accountIndex), batch, new AtomicInteger(offset), next, previous)
       cache.put(id, newRecord)
       next.map { nexts.put(_, id)}
       poolTrees.get(poolId) match {
@@ -87,7 +88,7 @@ class OperationCache extends Logging {
           record.walletName,
           record.accountIndex,
           record.batch,
-          new AtomicLong(record.batch + record.offset()),
+          new AtomicInteger(record.batch + record.offset()),
           Some(UUID.randomUUID()),
           Some(current))
         case None => throw OperationNotFoundException(current)
@@ -209,7 +210,7 @@ class OperationCache extends Logging {
                      val walletName: Option[String],
                      val accountIndex: Option[Int],
                      val batch: Int,
-                     private val ofst: AtomicLong,
+                     private val ofst: AtomicInteger,
                      val next: Option[UUID],
                      val previous: Option[UUID]) {
 
@@ -225,6 +226,6 @@ class OperationCache extends Logging {
       *
       * @return the offset.
       */
-    def offset(): Long = ofst.get()
+    def offset(): Int = ofst.get()
   }
 }
