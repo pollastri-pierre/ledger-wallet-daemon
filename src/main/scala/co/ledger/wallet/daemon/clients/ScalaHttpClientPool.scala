@@ -64,6 +64,7 @@ object ScalaHttpClientPool extends Logging {
     .withRetryBackoff(Backoff.linear(
       Duration.fromMilliseconds(DaemonConfiguration.explorer.client.retryBackoff),
       Duration.fromMilliseconds(DaemonConfiguration.explorer.client.retryBackoff)))
+    .withSessionQualifier.noFailFast
     .withSessionPool.maxSize(DaemonConfiguration.explorer.client.connectionPoolSize)
     .withSessionPool.ttl(Duration.fromSeconds(DaemonConfiguration.explorer.client.connectionTtl))
 
