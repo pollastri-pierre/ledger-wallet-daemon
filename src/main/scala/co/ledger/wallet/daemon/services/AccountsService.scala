@@ -193,7 +193,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
         }
     }
 
-  def getBatchedERC20Operations(tokenAccountInfo: TokenAccountInfo, offset: Long, batch: Int): Future[List[OperationView]] =
+  def getBatchedERC20Operations(tokenAccountInfo: TokenAccountInfo, offset: Int, batch: Int): Future[List[OperationView]] =
     daemonCache.withAccountAndWallet(tokenAccountInfo.accountInfo) {
       case (account, wallet) =>
         account.batchedErc20Operations(tokenAccountInfo.tokenAddress, offset, batch).flatMap { operations =>
@@ -205,7 +205,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache) extends DaemonService 
         })
     }
 
-  def getBatchedERC20Operations(accountInfo: AccountInfo, offset: Long, batch: Int): Future[List[OperationView]] =
+  def getBatchedERC20Operations(accountInfo: AccountInfo, offset: Int, batch: Int): Future[List[OperationView]] =
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) =>
         account.batchedErc20Operations(offset, batch).flatMap { operations =>

@@ -54,6 +54,7 @@ object Operations {
       account.getIndex,
       operation.getSenders.asScala.toList,
       operation.getRecipients.asScala.toList,
+      operation.getSelfRecipients.asScala.toList,
       getTransactionView(operation, curFamily)
     )
   }
@@ -94,6 +95,7 @@ object Operations {
                             @JsonProperty("account_index") accountIndex: Int,
                             @JsonProperty("senders") senders: Seq[String],
                             @JsonProperty("recipients") recipients: Seq[String],
+                            @JsonProperty("self_recipients") selfRecipients: Seq[String],
                             @JsonProperty("transaction") transaction: Option[TransactionView]
                           )
 

@@ -111,7 +111,7 @@ caching = {
 }
 explorer = {
   api = {
-    connection_pool_size = 50
+    connection_pool_size = 5
     fallback_timeout = 1000 # ms
     fallback_timeout = ${?FALLBACK_TIMEOUT}
     paths = [
