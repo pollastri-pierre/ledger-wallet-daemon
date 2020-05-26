@@ -136,7 +136,7 @@ object TransactionsController {
                                          amount: String,
                                          merge_utxo_strategy: Option[String],
                                          exclude_utxos: Option[Map[String, Int]],
-                                         partialTx: Option[Boolean]
+                                         partial_tx: Option[Boolean]
                                         ) extends CreateTransactionRequest {
     def amountValue: BigInt = BigInt(amount)
 
@@ -146,7 +146,7 @@ object TransactionsController {
       recipient, feesPerByteValue, fees_level, amountValue,
       merge_utxo_strategy.map(BitcoinLikePickingStrategy.valueOf).getOrElse(BitcoinLikePickingStrategy.OPTIMIZE_SIZE),
       exclude_utxos.getOrElse(Map[String, Int]()),
-      partialTx
+      partial_tx
     )
 
     @MethodValidation

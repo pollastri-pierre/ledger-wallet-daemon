@@ -263,7 +263,7 @@ object Account extends Logging {
         .pickInputs(ti.pickingStrategy, UnsignedInteger.MAX_VALUE.intValue())
         .setFeesPerByte(c.convertAmount(feesPerByte))
         .build()
-      v <- Bitcoin.newUnsignedTransactionView(tx, feesPerByte)
+      v <- Bitcoin.newUnsignedTransactionView(tx, feesPerByte, partial)
     } yield v
   }
 
@@ -338,6 +338,7 @@ object Account extends Logging {
   }
 
   def createTransaction(transactionInfo: TransactionInfo, a: core.Account, c: core.Currency)(implicit ec: ExecutionContext): Future[TransactionView] = {
+    info(s"Creating transaction $transactionInfo")
     (transactionInfo, c.getWalletType) match {
       case (ti: BTCTransactionInfo, WalletType.BITCOIN) => createBTCTransaction(ti, a, c)
       case (ti: ETHTransactionInfo, WalletType.ETHEREUM) => createETHTransaction(ti, a, c)
