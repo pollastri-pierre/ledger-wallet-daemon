@@ -287,6 +287,11 @@ explorer = {
         path = ${?FEES_ZEC_PATH}
     }
     {
+        currency = "qtum"
+        path = "/blockchain/v2/qtum/fees"
+        path = ${?FEES_QTUM_PATH}
+    }
+    {
         currency = "ethereum"
         path = "/blockchain/v3/eth/fees"
         path = ${?FEES_ETH_PATH}
