@@ -261,4 +261,5 @@ object DaemonConfiguration extends Logging {
 
   case class FeesPath(path: String)
 
+  case class SynchronizationConfig(delay: Int, frequency: Int)
 }
