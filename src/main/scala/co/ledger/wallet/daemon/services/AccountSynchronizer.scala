@@ -5,6 +5,7 @@ import java.util.concurrent.{ConcurrentHashMap, Executors, Semaphore}
 
 import co.ledger.core.Account
 import co.ledger.core.implicits._
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.AccountInfo
@@ -17,11 +18,12 @@ import javax.inject.{Inject, Singleton}
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutorService, Future}
+import scala.util.Success
 
 /**
- * This module is responsible to maintain account updated
- * It's pluggable to external trigger
- */
+  * This module is responsible to maintain account updated
+  * It's pluggable to external trigger
+  */
 @Singleton
 class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends DaemonService {
 
@@ -34,7 +36,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends Dae
   )
 
   lazy private val periodicRegisterAccount =
-    scheduler.schedule(Duration.fromSeconds(600))(registerAccounts)
+    scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncAccountRegisterInterval))(registerAccounts)
 
   private val map = new ConcurrentHashMap[AccountInfo, AccountSynchronizer]()
 
@@ -99,20 +101,20 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends Dae
 }
 
 /**
- * AccountSynchronizer manages all synchronization task related to the account.
- * An account sync will be triggerred periodically.
- * An account can have following states:
- * Synced(blockHeight)                    external trigger
- * periodic trigger ^                |    ^                      |
- * |                v       \                   v
- * Syncing(fromHeight)       Resyncing(targetHeight, currentHeight)
- *
- * @param account
- * @param poolName
- * @param walletName
- * @param scheduler
- * @param ec the execution context for the synchronization job
- */
+  * AccountSynchronizer manages all synchronization task related to the account.
+  * An account sync will be triggerred periodically.
+  * An account can have following states:
+  * Synced(blockHeight)                    external trigger
+  * periodic trigger ^                |    ^                      |
+  * |                v       \                   v
+  * Syncing(fromHeight)       Resyncing(targetHeight, currentHeight)
+  *
+  * @param account
+  * @param poolName
+  * @param walletName
+  * @param scheduler
+  * @param ec the execution context for the synchronization job
+  */
 class AccountSynchronizer(account: Account, poolName: String, walletName: String, scheduler: Timer)
                          (implicit ec: ExecutionContext) extends Logging {
   private var syncStatus: SyncStatus = Synced(0)
@@ -126,17 +128,17 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
   }
 
   // Periodically try to trigger sync. the sync will be triggered when status is Synced
-  val periodicSyncTask = scheduler.schedule(Duration.fromSeconds(10)) {
+  val periodicSyncTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncInterval)) {
     startPeriodicSync()
   }
   // Periodically try to update the current height in resync status.
   // do nothing if the status is not Resyncing
-  val periodicResyncStatusCheckTask = scheduler.schedule(Duration.fromSeconds(3)) {
+  val periodicResyncStatusCheckTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncStatusCheckInterval)) {
     periodicUpdateStatus()
   }
   // Periodically try to resync. It's competing with periodic sync.
   // The resync will be triggered when status is Synced and there is a resync latch
-  val periodicResyncCheckTask = scheduler.schedule(Duration.fromSeconds(3)) {
+  val periodicResyncCheckTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.resyncCheckInterval)) {
     tryResyncAccount()
   }
 
@@ -190,7 +192,7 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
   }
 
   private def lastBlockHeightSync: Long = {
-    val f: Future[Long] = account.firstOperation.map{ o =>
+    val f: Future[Long] = account.firstOperation.map { o =>
       val optionLong: Option[Long] = o.map(_.getBlockHeight) // walk around for java type conversion
       optionLong.getOrElse(0L)
     }
@@ -219,18 +221,17 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
 
   private def syncAccount() = {
     onSynchronizationStart()
-    for {
-      syncResult <- account.sync(poolName, walletName)
-    } yield {
-      this.synchronized {
-        if (syncResult.syncResult) {
+    account.sync(poolName, walletName)
+      .andThen {
+        case Success(value) if value.syncResult => this.synchronized {
           syncStatus = Synced(lastBlockHeightSync)
-        } else {
-          syncStatus = FailedToSync(s"SYNC : failed to sync account $accountInfo")
+          onSynchronizationEnds()
         }
-        onSynchronizationEnds()
+        case _ => this.synchronized {
+          syncStatus = FailedToSync(s"SYNC : failed to sync account $accountInfo")
+          onSynchronizationEnds()
+        }
       }
-    }
   }
 
   private def onSynchronizationStart(): Unit = {
@@ -264,10 +265,10 @@ case class FailedToSync(reason: String) extends SyncStatus {
 }
 
 /**
- * targetHeight is the height of the most recent operation of the account before the resync.
- * currentHeight is the height of the most recent operation of the account during resyncing.
- * they serve as a progress indicator
- */
+  * targetHeight is the height of the most recent operation of the account before the resync.
+  * currentHeight is the height of the most recent operation of the account during resyncing.
+  * they serve as a progress indicator
+  */
 case class Resyncing(
                       @JsonProperty("sync_status_target") targetHeight: Long,
                       @JsonProperty("sync_status_current") currentHeight: Long
