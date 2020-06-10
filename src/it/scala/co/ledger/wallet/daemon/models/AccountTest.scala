@@ -10,12 +10,14 @@ import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.NativeLibLoader
+import org.junit.Test
 // import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
+@Test
 class AccountTest extends AssertionsForJUnit {
   NativeLibLoader.loadLibs()
 
