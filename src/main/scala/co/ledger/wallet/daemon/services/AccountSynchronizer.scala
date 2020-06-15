@@ -4,17 +4,21 @@ import java.util.Date
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ConcurrentHashMap, Executors, Semaphore}
 
-import co.ledger.core.Account
+import cats.implicits._
+import co.ledger.core._
 import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.exceptions.AccountNotFoundException
+import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account._
+import co.ledger.wallet.daemon.models.Currency.RichCoreCurrency
 import co.ledger.wallet.daemon.models.Wallet._
-import co.ledger.wallet.daemon.models.{AccountInfo, Pool, PoolInfo}
+import co.ledger.wallet.daemon.models.{AccountInfo, Operations, Pool, PoolInfo}
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.concurrent.NamedPoolThreadFactory
+import com.twitter.finatra.json.FinatraObjectMapper
 import com.twitter.inject.Logging
 import com.twitter.util.{Duration, ScheduledThreadPoolTimer, Timer}
 import javax.inject.{Inject, Singleton}
@@ -29,31 +33,39 @@ import scala.util.{Success, Try}
   * It's pluggable to external trigger
   */
 @Singleton
-class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends DaemonService {
+class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, rabbitMQ: RabbitMQ)
+  extends DaemonService {
 
   // FIXME : ExecutionContext size
   implicit val synchronizationPool: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4 * Runtime.getRuntime.availableProcessors()))
 
+  // the scheduler used to schedule all the operation in ASM
   val scheduler = new ScheduledThreadPoolTimer(
     poolSize = 1,
     threadFactory = new NamedPoolThreadFactory("AccountSynchronizer-Scheduler")
   )
 
+  // When we start ASM, we register the existing accounts
+  // We periodically try to register account just in case there is new account created
   lazy private val periodicRegisterAccount =
     scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncAccountRegisterInterval))(registerAccounts)
 
+  // the cache to track the AS
   private val registeredAccounts = new ConcurrentHashMap[AccountInfo, AccountSynchronizer]()
 
+  // should be called after the instancialization of this class
   def start(): Unit = {
     registerAccounts
     periodicRegisterAccount
     info("Started account synchronizer manager")
   }
 
+  // An external control to resync an account
   def resyncAccount(accountInfo: AccountInfo): Unit = {
     Option(registeredAccounts.get(accountInfo)).foreach(_.resync())
   }
 
+  // An external control to sync an account
   def syncAccount(accountInfo: AccountInfo): Future[SynchronizationResult] = {
     Option(registeredAccounts.get(accountInfo)).fold({
       warn(s"Trying to sync an unregistered account. $accountInfo")
@@ -62,26 +74,26 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends Dae
   }
 
   def syncPool(poolInfo: PoolInfo): Future[Seq[SynchronizationResult]] =
-    Future.sequence(Await.result(daemonCache.withWalletPool(poolInfo)(pool =>
+    daemonCache.withWalletPool(poolInfo)(pool =>
       for {
-        wallets <- pool.wallets.map(_.map(w => (pool, w)))
-        syncResults <- Future.sequence(wallets.map { case (pool, wallet) =>
-          for {
-            accounts <- wallet.accounts
-          } yield accounts.map(account => syncAccount(AccountInfo(account.getIndex, wallet.getName, pool.name, poolInfo.pubKey)))
-        }).map(_.flatten)
-      } yield syncResults
-    ), 1.minute))
+        wallets <- pool.wallets
+        syncResults <- wallets.toList.traverse { wallet =>
+            wallet.accounts.flatMap(_.toList.traverse(account =>
+              syncAccount(AccountInfo(account.getIndex, wallet.getName, pool.name, poolInfo.pubKey)))
+            )
+        }
+      } yield syncResults.flatten
+    )
 
   def syncAllRegisteredAccounts(): Future[Seq[SynchronizationResult]] =
     Future.sequence(registeredAccounts.asScala.map {
       case (_, accountSynchronizer) => accountSynchronizer.eventuallyStartSync()
     }.toSeq)
 
-  def registerAccount(account: Account, accountInfo: AccountInfo): Unit = this.synchronized {
+  def registerAccount(account: Account, wallet: Wallet, accountInfo: AccountInfo): Unit = this.synchronized {
     registeredAccounts.computeIfAbsent(accountInfo, (i: AccountInfo) => {
       info(s"registered account $i to account synchronizer manager")
-      new AccountSynchronizer(account, poolName = i.poolName, walletName = i.walletName, scheduler)
+      new AccountSynchronizer(account, wallet, poolName = i.poolName, scheduler, rabbitMQ)
     })
   }
 
@@ -139,7 +151,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends Dae
             poolName = pool.name,
             accountIndex = account.getIndex
           )
-          registerAccount(account, accountInfo)
+          registerAccount(account, wallet, accountInfo)
       }
     }
   }
@@ -165,14 +177,18 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache) extends Dae
   * |                v       \                   v
   * Syncing(fromHeight)       Resyncing(targetHeight, currentHeight)
   *
-  * @param account
-  * @param poolName
-  * @param walletName
-  * @param scheduler
   * @param ec the execution context for the synchronization job
   */
-class AccountSynchronizer(account: Account, poolName: String, walletName: String, scheduler: Timer)
+class AccountSynchronizer(account: Account,
+                          wallet: Wallet,
+                          poolName: String,
+                          scheduler: Timer,
+                          rabbitmq: RabbitMQ)
                          (implicit ec: ExecutionContext) extends Logging {
+  private val currencyName = wallet.getCurrency.getName
+  private val walletName = wallet.getName
+  private val mapper = FinatraObjectMapper.create()
+  // The core of the state machine, any change to it should be this.synchronised
   private var syncStatus: SyncStatus = Synced(0)
   private val syncFuture: AtomicReference[Future[SynchronizationResult]] = new AtomicReference(
     Future.successful(SynchronizationResult.apply(account.getIndex, walletName, poolName, syncResult = false)))
@@ -186,6 +202,61 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
     s
   }
 
+  private val OP_ID_EVENT_KEY = "EV_NEW_OP_UID"
+
+  private val eventReceiver = new EventReceiver {
+    override def onEvent(event: Event): Unit = {
+      event.getCode match {
+        case EventCode.NEW_OPERATION =>
+          val uid = event.getPayload.getString(OP_ID_EVENT_KEY)
+          account.operation(uid, 1).foreach {
+            case Some(op) =>
+              operationPayload(op).foreach(payload =>
+                rabbitmq.publish(poolName, getTransactionRoutingKeys(op), payload)
+              )
+              accountPayload().foreach { payload =>
+                rabbitmq.publish(poolName, getAccountRoutingKeys, payload)
+              }
+            case _ =>
+          }
+        case _ =>
+      }
+    }
+  }
+
+  private def operationPayload(op: Operation): Future[Array[Byte]] = {
+    Operations.getView(op, wallet, account).map {
+      mapper.writeValueAsBytes(_)
+    }
+  }
+
+  private def accountPayload(): Future[Array[Byte]] = this.synchronized {
+    account.accountView(walletName, wallet.getCurrency.currencyView, syncStatus).map {
+      mapper.writeValueAsBytes(_)
+    }
+  }
+
+  private def getTransactionRoutingKeys(op: Operation): List[String] = {
+    List(
+      "transactions",
+      poolName,
+      currencyName,
+      account.getIndex.toString,
+      op.getOperationType.toString.toLowerCase
+    )
+  }
+
+  private def getAccountRoutingKeys: List[String] = {
+    List(
+      "accounts",
+      poolName,
+      currencyName,
+      account.getIndex.toString
+    )
+  }
+
+  account.getEventBus.subscribe(LedgerCoreExecutionContext(ec), eventReceiver)
+
   // Periodically try to trigger sync. the sync will be triggered when status is Synced
   val periodicSyncTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncInterval)) {
     eventuallyStartSync()
@@ -193,15 +264,14 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
 
   // Periodically try to update the current height in resync status.
   // do nothing if the status is not Resyncing
-  val periodicResyncStatusCheckTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncStatusCheckInterval)) {
+  private val periodicResyncStatusCheckTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncStatusCheckInterval)) {
     periodicUpdateStatus()
   }
   // Periodically try to resync. It's competing with periodic sync.
   // The resync will be triggered when status is Synced and there is a resync latch
-  val periodicResyncCheckTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.resyncCheckInterval)) {
+  private val periodicResyncCheckTask = scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.resyncCheckInterval)) {
     tryResyncAccount()
   }
-
 
   def getSyncStatus: SyncStatus = this.synchronized(syncStatus)
 
@@ -225,6 +295,7 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
     periodicResyncCheckTask.cancel()
     periodicResyncStatusCheckTask.cancel()
     periodicSyncTask.cancel()
+    account.getEventBus.unsubscribe(eventReceiver)
     Future(Try(Await.result(syncFuture.get(), awaitOngoingSyncTimeout.inMilliseconds.millisecond))
       .fold(t => s"Failed to await for end of synchronization $accountInfo, status : $syncStatus due to error : $t",
         r => s"Successfully ended synchronization of account $accountInfo status : $syncStatus syncResult: $r"))
@@ -263,7 +334,7 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
       val optionLong: Option[Long] = o.map(_.getBlockHeight) // walk around for java type conversion
       optionLong.getOrElse(0L)
     }
-    Await.result(f, 3.seconds)
+    Try(Await.result(f, 3.seconds)).getOrElse(-1)
   }
 
   // This method is called periodically by `periodicResyncCheck` task
@@ -288,20 +359,20 @@ class AccountSynchronizer(account: Account, poolName: String, walletName: String
   }
 
   private def syncAccount(): Future[SynchronizationResult] = {
-    this.synchronized {
-      onSynchronizationStart()
-      account.sync(poolName, walletName)
-        .andThen {
-          case Success(value) if value.syncResult => this.synchronized {
+    onSynchronizationStart()
+    account.sync(poolName, walletName)
+      .andThen {
+        case Success(value) if value.syncResult =>
+          this.synchronized {
             syncStatus = Synced(lastBlockHeightSync)
             onSynchronizationEnds()
           }
-          case _ => this.synchronized {
+        case _ =>
+          this.synchronized {
             syncStatus = FailedToSync(s"SYNC : failed to sync account $accountInfo")
             onSynchronizationEnds()
           }
-        }
-    }
+      }
   }
 
   private def onSynchronizationStart(): Unit = {
