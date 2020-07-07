@@ -130,5 +130,6 @@ workflows:
                 - develop-drop2
                 - release_candidate
                 - release_candidate_drop2
+                - /coin\/.*/
             tags:
               only: /.*/
