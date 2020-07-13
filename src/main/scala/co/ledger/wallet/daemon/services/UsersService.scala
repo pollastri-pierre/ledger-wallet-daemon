@@ -22,7 +22,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     daemonCache.getUser(pubKey)
   }
 
-  def createUser(publicKey: String, permissions: Int = 0): Future[Long] = {
+  def createUser(publicKey: String, permissions: Int = 0): Future[User] = {
     info(LogMsgMaker.newInstance("Create user")
       .append("pub_key", publicKey)
       .append("permissions", permissions)
@@ -30,7 +30,7 @@ class UsersService @Inject()(daemonCache: DaemonCache, ecdsa: ECDSAService) exte
     daemonCache.createUser(publicKey, permissions)
   }
 
-  def createUser(username: String, password: String): Future[Long] = {
+  def createUser(username: String, password: String): Future[User] = {
     info(LogMsgMaker.newInstance("Create user")
       .append("username", username)
       .toString())

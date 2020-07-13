@@ -16,7 +16,6 @@ import scala.util.Try
 object DaemonConfiguration extends Logging {
   private val config = ConfigFactory.load()
   private val PERMISSION_CREATE_USER: Int = 0x01
-  private val DEFAULT_AUTH_TOKEN_DURATION: Int = 3600 * 1000 // 30 seconds
   private val DEFAULT_SYNC_INTERVAL: Int = 24 // 24 hours
   private val DEFAULT_SYNC_INITIAL_DELAY: Int = 300 // 5 minutes
   // Default value for keeping alive connections inside the client connection pool
@@ -78,14 +77,6 @@ object DaemonConfiguration extends Logging {
     List[(String, Int)]()
   }
 
-  val authTokenDuration: Int =
-    if (config.hasPath("authentication.token_duration")) {
-      config.getInt("authentication.token_duration_in_seconds") * 1000
-    }
-    else {
-      DEFAULT_AUTH_TOKEN_DURATION
-    }
-
   val dbProfileName: String = Try(config.getString("database_engine")).toOption.getOrElse("sqlite3")
 
   val dbProfile: JdbcProfile = dbProfileName match {
@@ -99,7 +90,6 @@ object DaemonConfiguration extends Logging {
   }
 
   val isWhiteListDisabled: Boolean = if (!config.hasPath("disable_whitelist")) false else config.getBoolean("disable_whitelist")
-  val isAuthenticationDisabled: Boolean = Try(config.getBoolean("authentication.disable")).getOrElse(false)
 
   val updateWalletConfig: Boolean = if (config.hasPath("update_wallet_config")) config.getBoolean("update_wallet_config") else false
 

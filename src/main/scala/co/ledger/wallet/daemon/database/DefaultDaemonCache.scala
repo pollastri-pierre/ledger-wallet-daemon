@@ -54,12 +54,13 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
     }
   }
 
-  def createUser(pubKey: String, permissions: Int): Future[Long] = {
+  def createUser(pubKey: String, permissions: Int): Future[User] = {
     val user = UserDto(pubKey, permissions)
     dbDao.insertUser(user).map { id =>
-      users.put(user.pubKey, new User(id, user.pubKey))
+      val u = new User(id, user.pubKey)
+      users.put(user.pubKey, u)
       info(LogMsgMaker.newInstance("User created").append("user", users(user.pubKey)).toString())
-      id
+      u
     }
   }
 

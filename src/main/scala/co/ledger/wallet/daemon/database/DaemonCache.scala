@@ -115,7 +115,7 @@ trait DaemonCache {
       case None => Future.failed(UserNotFoundException(pubKey))
     }
 
-  def createUser(pubKey: String, permissions: Int): Future[Long]
+  def createUser(pubKey: String, permissions: Int): Future[User]
 
   def getUsers: Future[Seq[User]]
 
