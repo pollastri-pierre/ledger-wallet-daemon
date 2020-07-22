@@ -214,9 +214,6 @@ class AccountSynchronizer(account: Account,
               operationPayload(op).foreach(payload =>
                 rabbitmq.publish(poolName, getTransactionRoutingKeys(op), payload)
               )
-              accountPayload().foreach { payload =>
-                rabbitmq.publish(poolName, getAccountRoutingKeys, payload)
-              }
             case _ =>
           }
         case _ =>
@@ -381,6 +378,9 @@ class AccountSynchronizer(account: Account,
 
   private def onSynchronizationEnds(): Unit = this.synchronized {
     info(s"SYNC : $accountInfo has been synced : $syncStatus")
+    accountPayload().foreach { payload =>
+      rabbitmq.publish(poolName, getAccountRoutingKeys, payload)
+    }
   }
 
   private def accountInfo: String = {
