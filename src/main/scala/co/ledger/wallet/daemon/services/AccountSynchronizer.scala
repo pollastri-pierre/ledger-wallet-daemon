@@ -39,26 +39,33 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, rabbitMQ: R
   // FIXME : ExecutionContext size
   implicit val synchronizationPool: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4 * Runtime.getRuntime.availableProcessors()))
 
+  // the scheduler used to schedule all the operation in ASM
   val scheduler = new ScheduledThreadPoolTimer(
     poolSize = 1,
     threadFactory = new NamedPoolThreadFactory("AccountSynchronizer-Scheduler")
   )
 
+  // When we start ASM, we register the existing accounts
+  // We periodically try to register account just in case there is new account created
   lazy private val periodicRegisterAccount =
     scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncAccountRegisterInterval))(registerAccounts)
 
+  // the cache to track the AS
   private val registeredAccounts = new ConcurrentHashMap[AccountInfo, AccountSynchronizer]()
 
+  // should be called after the instancialization of this class
   def start(): Unit = {
     registerAccounts
     periodicRegisterAccount
     info("Started account synchronizer manager")
   }
 
+  // An external control to resync an account
   def resyncAccount(accountInfo: AccountInfo): Unit = {
     Option(registeredAccounts.get(accountInfo)).foreach(_.resync())
   }
 
+  // An external control to sync an account
   def syncAccount(accountInfo: AccountInfo): Future[SynchronizationResult] = {
     Option(registeredAccounts.get(accountInfo)).fold({
       warn(s"Trying to sync an unregistered account. $accountInfo")
@@ -181,6 +188,7 @@ class AccountSynchronizer(account: Account,
   private val currencyName = wallet.getCurrency.getName
   private val walletName = wallet.getName
   private val mapper = FinatraObjectMapper.create()
+  // The core of the state machine, any change to it should be this.synchronised
   private var syncStatus: SyncStatus = Synced(0)
   private val syncFuture: AtomicReference[Future[SynchronizationResult]] = new AtomicReference(
     Future.successful(SynchronizationResult.apply(account.getIndex, walletName, poolName, syncResult = false)))
