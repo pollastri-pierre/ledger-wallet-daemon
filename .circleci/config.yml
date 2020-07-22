@@ -61,6 +61,8 @@ jobs:
           POSTGRES_PASSWORD: ledger_secret
         command: -c "ssl=on" -c "ssl_key_file=/etc/ssl/private/ssl-cert-snakeoil.key" -c "ssl_cert_file=/etc/ssl/certs/ssl-cert-snakeoil.pem"
       - image: rabbitmq:3
+        environment:
+          RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 512MiB
     steps:
       - checkout
       - restore_cache: *dependencies_cache
