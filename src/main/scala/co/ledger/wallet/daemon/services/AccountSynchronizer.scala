@@ -326,7 +326,7 @@ class AccountSynchronizer(account: Account,
       val optionLong: Option[Long] = o.map(_.getBlockHeight) // walk around for java type conversion
       optionLong.getOrElse(0L)
     }
-    Await.result(f, 3.seconds)
+    Try(Await.result(f, 3.seconds)).getOrElse(-1)
   }
 
   // This method is called periodically by `periodicResyncCheck` task
