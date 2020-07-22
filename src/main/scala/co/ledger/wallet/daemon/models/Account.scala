@@ -463,7 +463,7 @@ object Account extends Logging {
     q.filter().opAnd(core.QueryFilter.operationUidEq(uid))
     (if (fullOp > 0) q.complete().execute()
     else q.partial().execute()).map { ops =>
-      debug(s"${ops.size()} returned with uid $uid")
+      debug(s"Found ${ops.size()} operation(s) with uid : $uid")
       ops.asScala.headOption
     }
   }
