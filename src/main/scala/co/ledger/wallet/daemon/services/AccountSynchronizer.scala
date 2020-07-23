@@ -274,7 +274,7 @@ class AccountSynchronizer(account: Account,
     tryResyncAccount()
   }
 
-  def getSyncStatus: SyncStatus = this.synchronized(syncStatus)
+  def getSyncStatus: SyncStatus = this.synchronized(syncStatus.copy)
 
   // A external control for account resync
   // the resync will be queued if status is not Resyncing
@@ -396,21 +396,28 @@ class AccountSynchronizer(account: Account,
 
 sealed trait SyncStatus{
   def value: String
+  def copy: SyncStatus
 }
 
 case class Synced(atHeight: Long) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "synced"
+
+  override def copy: SyncStatus = Synced(atHeight)
 }
 
 case class Syncing(fromHeight: Long, currentHeight: Long) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "syncing"
+
+  override def copy: SyncStatus = Syncing(fromHeight, currentHeight)
 }
 
 case class FailedToSync(reason: String) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "failed"
+
+  override def copy: SyncStatus = FailedToSync(reason)
 }
 
 /*
@@ -424,4 +431,6 @@ case class Resyncing(
                     ) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "resyncing"
+
+  override def copy: SyncStatus = Resyncing(targetOpCount, currentOpCount)
 }
