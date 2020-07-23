@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.services
 
 import java.util.Date
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
 import java.util.concurrent.{ConcurrentHashMap, Executors, Semaphore}
 
 import cats.implicits._
@@ -192,6 +192,9 @@ class AccountSynchronizer(account: Account,
   private var syncStatus: SyncStatus = Synced(0)
   private val syncFuture: AtomicReference[Future[SynchronizationResult]] = new AtomicReference(
     Future.successful(SynchronizationResult.apply(account.getIndex, walletName, poolName, syncResult = false)))
+  // A counter to count the new operation event that is received.
+  // Used to work with resync to indicate the resync progress
+  private val opCounter: AtomicLong = new AtomicLong()
 
   // When the account is syncing, we received a resync request, we will
   // put it in queue. There is a synchronizer reading the queue periodically
@@ -208,6 +211,7 @@ class AccountSynchronizer(account: Account,
     override def onEvent(event: Event): Unit = {
       event.getCode match {
         case EventCode.NEW_OPERATION =>
+          opCounter.incrementAndGet()
           val uid = event.getPayload.getString(OP_ID_EVENT_KEY)
           account.operation(uid, 1).foreach {
             case Some(op) =>
@@ -270,7 +274,7 @@ class AccountSynchronizer(account: Account,
     tryResyncAccount()
   }
 
-  def getSyncStatus: SyncStatus = this.synchronized(syncStatus)
+  def getSyncStatus: SyncStatus = this.synchronized(syncStatus.copy)
 
   // A external control for account resync
   // the resync will be queued if status is not Resyncing
@@ -317,8 +321,7 @@ class AccountSynchronizer(account: Account,
   private def periodicUpdateStatus() = this.synchronized {
     syncStatus match {
       case Resyncing(target, _) =>
-        val lastHeight = lastBlockHeightSync
-        syncStatus = Resyncing(target, lastHeight)
+        syncStatus = Resyncing(target, opCounter.get())
       case Syncing(fromHeight, _) =>
         val lastHeight = lastBlockHeightSync
         syncStatus = Syncing(fromHeight, lastHeight)
@@ -340,7 +343,10 @@ class AccountSynchronizer(account: Account,
       info(s"RESYNC : try to resync account $accountInfo")
       syncStatus match {
         case Synced(_) | FailedToSync(_) => // do resync
-          syncStatus = Resyncing(lastBlockHeightSync, 0)
+          // await the future to be able to sync syncStatus change
+          val targetOpCounts = Try(Await.result(account.operationCounts.map(_.values.sum), 10.seconds)).getOrElse(-1)
+          opCounter.set(0)
+          syncStatus = Resyncing(targetOpCounts, 0)
           info(s"RESYNC : resyncing $accountInfo")
           val syncTask = for {
             _ <- account.eraseDataSince(new Date(0))
@@ -390,21 +396,28 @@ class AccountSynchronizer(account: Account,
 
 sealed trait SyncStatus{
   def value: String
+  def copy: SyncStatus
 }
 
 case class Synced(atHeight: Long) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "synced"
+
+  override def copy: SyncStatus = Synced(atHeight)
 }
 
 case class Syncing(fromHeight: Long, currentHeight: Long) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "syncing"
+
+  override def copy: SyncStatus = Syncing(fromHeight, currentHeight)
 }
 
 case class FailedToSync(reason: String) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "failed"
+
+  override def copy: SyncStatus = FailedToSync(reason)
 }
 
 /*
@@ -413,9 +426,11 @@ case class FailedToSync(reason: String) extends SyncStatus {
   * they serve as a progress indicator
   */
 case class Resyncing(
-                      @JsonProperty("sync_status_target") targetHeight: Long,
-                      @JsonProperty("sync_status_current") currentHeight: Long
+                      @JsonProperty("sync_status_target") targetOpCount: Long,
+                      @JsonProperty("sync_status_current") currentOpCount: Long
                     ) extends SyncStatus {
   @JsonProperty("value")
   def value: String = "resyncing"
+
+  override def copy: SyncStatus = Resyncing(targetOpCount, currentOpCount)
 }
