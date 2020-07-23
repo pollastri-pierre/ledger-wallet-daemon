@@ -89,6 +89,11 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
       accountsService.resynchronizeAccount(request.accountInfo)
     }
 
+    get("/accounts/:account_index/sync-status") { request: AccountRequest =>
+      info(s"get account sync status $request")
+      accountsService.syncStatus(request.accountInfo)
+    }
+
     // End point queries for account view with specified pool, wallet name, and unique account index.
     prefix("/accounts/:account_index") {
 

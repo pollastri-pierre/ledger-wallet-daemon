@@ -75,6 +75,10 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     synchronizerManager.resyncAccount(accountInfo)
   }
 
+  def syncStatus(accountInfo: AccountInfo): Option[SyncStatus] = {
+    synchronizerManager.getSyncStatus(accountInfo)
+  }
+
   /**
     * Method to synchronize account operations from public resources. The method may take a while
     * to finish. This method only synchronize a single account.
