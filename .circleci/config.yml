@@ -63,6 +63,7 @@ jobs:
       - image: rabbitmq:3
         environment:
           RABBITMQ_VM_MEMORY_HIGH_WATERMARK: 512MiB
+    resource_class: large
     steps:
       - checkout
       - restore_cache: *dependencies_cache
