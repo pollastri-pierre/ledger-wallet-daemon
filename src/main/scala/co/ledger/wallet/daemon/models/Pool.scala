@@ -247,7 +247,7 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
 
 object Pool extends Logging {
   private val config = ConfigFactory.load()
-  var preferenceBackend: PostgresPreferenceBackend = null
+  var preferenceBackend: PostgresPreferenceBackend = _
 
   def newInstance(coreP: core.WalletPool, id: Long): Pool = {
     new Pool(coreP, id)
@@ -264,14 +264,14 @@ object Pool extends Logging {
           dbHost <- Try(config.getString("postgres.host"))
           dbUserName <- Try(config.getString("postgres.username"))
           dbPwd <- Try(config.getString("postgres.password"))
-          dbPrefix <- Try(config.getString("postgres.db_name_prefix"))
+          dbPrefix <- Try(config.getString("postgres.core.db_name_prefix"))
         } yield {
           // Ref: postgres://USERNAME:PASSWORD@HOST:PORT/DBNAME
           if (dbPwd.isEmpty) {
-            (s"postgres://${dbUserName}@${dbHost}:${dbPort}/${dbPrefix}${poolDto.name}",
+            (s"postgres://$dbUserName@$dbHost:$dbPort/$dbPrefix${poolDto.name}",
               s"jdbc:postgresql://$dbHost:$dbPort/$dbPrefix${poolDto.name}?user=$dbUserName")
           } else {
-            (s"postgres://${dbUserName}:${dbPwd}@${dbHost}:${dbPort}/${dbPrefix}${poolDto.name}",
+            (s"postgres://$dbUserName:$dbPwd@$dbHost:$dbPort/$dbPrefix${poolDto.name}",
               s"jdbc:postgresql://$dbHost:$dbPort/$dbPrefix${poolDto.name}?user=$dbUserName&password=$dbPwd")
           }
         }
