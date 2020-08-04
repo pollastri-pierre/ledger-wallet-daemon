@@ -93,8 +93,6 @@ object DaemonConfiguration extends Logging {
 
   val isWhiteListDisabled: Boolean = if (!config.hasPath("disable_whitelist")) false else config.getBoolean("disable_whitelist")
 
-  val updateWalletConfig: Boolean = if (config.hasPath("update_wallet_config")) config.getBoolean("update_wallet_config") else false
-
   object Synchronization {
     val syncInterval = if (config.hasPath("synchronization.sync_interval_in_seconds")) {
       config.getInt("synchronization.sync_interval_in_seconds")
@@ -175,7 +173,7 @@ object DaemonConfiguration extends Logging {
 
   val isPrintCoreLibLogsEnabled: Boolean = config.hasPath("debug.print_core_logs") && config.getBoolean("debug.print_core_logs")
 
-  lazy val coreDataPath: String = Try(config.getString("core_data_path")).getOrElse("./core_data")
+  lazy val coreDataPath: String = Try(config.getString("core.core_data_path")).getOrElse("./core_data")
 
   val explorer: ExplorerConfig = {
     val explorer = config.getConfig("explorer")
@@ -207,14 +205,15 @@ object DaemonConfiguration extends Logging {
     } else {
       DEFAULT_CLIENT_CONNECTION_TTL
     }
-    val paths = api.getConfigList("paths").asScala.toList.map { path =>
+    val explorerInfos = api.getConfigList("paths").asScala.toList.map { path =>
       val currency = path.getString("currency")
       val host = path.getString("host")
       val port = path.getInt("port")
       val fallback = Try(path.getString("fallback")).toOption
       val explorerVersion = Try(path.getString("explorer_version")).toOption
       val disableSyncToken = Try(path.getBoolean("disable_sync_token")).getOrElse(false)
-      currency -> PathConfig(host, port, disableSyncToken, fallback, explorerVersion)
+      val feesPath = Try(path.getString("fees_path")).toOption.map(FeesPath)
+      currency -> PathConfig(host, port, disableSyncToken, fallback, explorerVersion, feesPath)
     }.toMap
 
     val proxyUseMap = api.getConfigList("paths").asScala.toList.map { path =>
@@ -226,14 +225,8 @@ object DaemonConfiguration extends Logging {
       NetUtils.urlToHost(url) -> proxyUse
     }.toMap
 
-    val fees = api.getConfigList("fees").asScala.toList.map { fee =>
-      val currency = fee.getString("currency")
-      val path = fee.getString("path")
-      currency -> FeesPath(path)
-    }.toMap
-
     ExplorerConfig(
-      ApiConfig(fallbackTimeout, paths, proxyUseMap, fees),
+      ApiConfig(fallbackTimeout, explorerInfos, proxyUseMap),
       ClientConnectionConfig(connectionPoolSize, retryBackoffDelta, connectionPoolTtl, retryTtl, retryMin, retryPercent))
   }
 
@@ -260,9 +253,9 @@ object DaemonConfiguration extends Logging {
 
   val rabbitMQUri: Try[String] = Try(config.getString("rabbitmq.uri"))
 
-  case class ApiConfig(fallbackTimeout: Int, paths: Map[String, PathConfig], proxyUse: Map[Host, Boolean], fees: Map[String, FeesPath])
+  case class ApiConfig(fallbackTimeout: Int, paths: Map[String, PathConfig], proxyUse: Map[Host, Boolean])
 
-  case class PathConfig(host: String, port: Int, disableSyncToken: Boolean, fallback: Option[String], explorerVersion: Option[String])
+  case class PathConfig(host: String, port: Int, disableSyncToken: Boolean, fallback: Option[String], explorerVersion: Option[String], feesPath: Option[FeesPath])
 
   case class ClientConnectionConfig(connectionPoolSize: Int, // Maximum concurrent connection inside a connection pool
                                     retryBackoff: Int, // In millis
