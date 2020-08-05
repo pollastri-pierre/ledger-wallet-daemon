@@ -19,10 +19,8 @@ import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
-import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.Utils
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
-import co.ledger.wallet.daemon.utils.{NetUtils, Utils}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import javax.inject.{Inject, Singleton}
 

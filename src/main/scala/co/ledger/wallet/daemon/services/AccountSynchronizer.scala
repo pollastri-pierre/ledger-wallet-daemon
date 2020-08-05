@@ -215,13 +215,47 @@ class AccountSynchronizer(account: Account,
           val uid = event.getPayload.getString(OP_ID_EVENT_KEY)
           account.operation(uid, 1).foreach {
             case Some(op) =>
-              operationPayload(op).foreach(payload =>
-                rabbitmq.publish(poolName, getTransactionRoutingKeys(op), payload)
-              )
+              publishOperation(op)
+              publishERC20Operation(op)
             case _ =>
           }
         case _ =>
       }
+    }
+  }
+
+  private def publishOperation(op: Operation): Unit = {
+    operationPayload(op).foreach(payload =>
+      rabbitmq.publish(poolName, getTransactionRoutingKeys(op), payload)
+    )
+  }
+
+  private def publishERC20Operation(op: Operation): Unit = {
+    if (account.isInstanceOfEthereumLikeAccount) {
+      val erc20Accounts = account.asEthereumLikeAccount().getERC20Accounts.asScala
+      val ethereumTransaction = op.asEthereumLikeOperation().getTransaction
+      val senderAddress = ethereumTransaction.getSender.toEIP55
+      val receiverAddress = ethereumTransaction.getReceiver.toEIP55
+      erc20Accounts.filter{erc20Account =>
+        val contractAddress = erc20Account.getToken.getContractAddress
+        contractAddress.equalsIgnoreCase(senderAddress) ||
+          contractAddress.equalsIgnoreCase(receiverAddress)
+      }.foreach{ erc20Account =>
+        erc20Account.getOperations.asScala
+          .filter(_.getHash.equalsIgnoreCase(ethereumTransaction.getHash))
+          .foreach{ erc20Operation =>
+            erc20OperationPayload(erc20Operation, op).foreach{ payload =>
+              val routingKey = getERC20TransactionRoutingKeys(erc20Operation)
+              rabbitmq.publish(poolName, routingKey, payload)
+            }
+          }
+      }
+    }
+  }
+
+  private def erc20OperationPayload(erc20Operation: ERC20LikeOperation, operation: Operation): Future[Array[Byte]] = {
+    Operations.getErc20View(erc20Operation, operation, wallet, account).map{
+      mapper.writeValueAsBytes(_)
     }
   }
 
@@ -235,6 +269,17 @@ class AccountSynchronizer(account: Account,
     account.accountView(walletName, wallet.getCurrency.currencyView, syncStatus).map {
       mapper.writeValueAsBytes(_)
     }
+  }
+
+  private def getERC20TransactionRoutingKeys(erc20Op: ERC20LikeOperation): List[String] = {
+    List(
+      "transactions",
+      poolName,
+      currencyName,
+      account.getIndex.toString,
+      "erc20",
+      erc20Op.getOperationType.toString.toLowerCase()
+    )
   }
 
   private def getTransactionRoutingKeys(op: Operation): List[String] = {
