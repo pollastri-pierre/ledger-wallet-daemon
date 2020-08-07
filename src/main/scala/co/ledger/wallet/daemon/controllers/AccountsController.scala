@@ -172,6 +172,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         accountsService.synchronizeAccount(request.accountInfo)
       }
 
+      post("/operations/repush") { request: RepushRequest =>
+        accountsService.repushOperations(request.accountInfo, request.from)
+      }
+
       // List of utxos available on this account
       get("/utxo") { request: UtxoAccountRequest =>
         accountsService.getUtxo(request.accountInfo, request.offset, request.batch)
@@ -428,5 +432,13 @@ object AccountsController {
                                @QueryParam full_op: Int = 0,
                                request: Request
                              ) extends BaseSingleAccountRequest
+
+  case class RepushRequest(
+                             @RouteParam override val pool_name: String,
+                             @RouteParam override val wallet_name: String,
+                             @RouteParam override val account_index: Int,
+                             @QueryParam from: Option[Long],
+                             request: Request
+                           ) extends BaseSingleAccountRequest
 
 }

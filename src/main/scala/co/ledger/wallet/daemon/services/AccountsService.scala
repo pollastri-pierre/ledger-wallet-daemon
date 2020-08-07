@@ -29,7 +29,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 @Singleton
-class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: AccountSynchronizerManager) extends DaemonService {
+class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: AccountSynchronizerManager, rabbitMQ: RabbitMQ) extends DaemonService {
 
   case class CacheKey(a: AccountInfo, contract: Option[String])
 
@@ -316,6 +316,25 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
         a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
       }
     }
+
+  def repushOperations(accountInfo: AccountInfo, fromHeight: Option[Long]): Future[Unit] = {
+    daemonCache.withAccountAndWallet(accountInfo) {
+      case (account, wallet) =>
+        val pushOperationFuture = account.operationsFromHeight(0, Int.MaxValue, 1, fromHeight.getOrElse(0))
+          .flatMap { ops =>
+            Future.sequence(ops.map{op => rabbitMQ.publishOperation(op, account, wallet, accountInfo.poolName)}).map(_ => Unit)
+          }
+        val pushErc20Future: Future[Unit] = if (account.isInstanceOfEthereumLikeAccount) {
+          account.erc20Operations.flatMap{ operations =>
+            Future.sequence(operations.map{
+              case (operation, erc20Operation) =>
+                rabbitMQ.publishERC20Operation(erc20Operation, operation, account, wallet, accountInfo.poolName)
+            })
+          }.map(_ => Unit)
+        } else Future.unit
+        pushOperationFuture.flatMap(_ => pushErc20Future)
+    }
+  }
 
   private def checkSyncStatus(account: AccountInfo) = {
     synchronizerManager.getSyncStatus(account).foreach {

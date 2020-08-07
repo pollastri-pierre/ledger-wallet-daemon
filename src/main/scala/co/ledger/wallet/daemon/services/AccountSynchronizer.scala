@@ -14,7 +14,7 @@ import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency.RichCoreCurrency
 import co.ledger.wallet.daemon.models.Wallet._
-import co.ledger.wallet.daemon.models.{AccountInfo, Operations, Pool, PoolInfo}
+import co.ledger.wallet.daemon.models.{AccountInfo, Pool, PoolInfo}
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.concurrent.NamedPoolThreadFactory
@@ -215,8 +215,8 @@ class AccountSynchronizer(account: Account,
           val uid = event.getPayload.getString(OP_ID_EVENT_KEY)
           account.operation(uid, 1).foreach {
             case Some(op) =>
-              publishOperation(op)
-              publishERC20Operation(op)
+              rabbitmq.publishOperation(op, account, wallet, poolName)
+              rabbitmq.publishERC20Operation(op, account, wallet, poolName)
             case _ =>
           }
         case _ =>
@@ -224,72 +224,10 @@ class AccountSynchronizer(account: Account,
     }
   }
 
-  private def publishOperation(op: Operation): Unit = {
-    operationPayload(op).foreach(payload =>
-      rabbitmq.publish(poolName, getTransactionRoutingKeys(op), payload)
-    )
-  }
-
-  private def publishERC20Operation(op: Operation): Unit = {
-    if (account.isInstanceOfEthereumLikeAccount) {
-      val erc20Accounts = account.asEthereumLikeAccount().getERC20Accounts.asScala
-      val ethereumTransaction = op.asEthereumLikeOperation().getTransaction
-      val senderAddress = ethereumTransaction.getSender.toEIP55
-      val receiverAddress = ethereumTransaction.getReceiver.toEIP55
-      erc20Accounts.filter{erc20Account =>
-        val contractAddress = erc20Account.getToken.getContractAddress
-        contractAddress.equalsIgnoreCase(senderAddress) ||
-          contractAddress.equalsIgnoreCase(receiverAddress)
-      }.foreach{ erc20Account =>
-        erc20Account.getOperations.asScala
-          .filter(_.getHash.equalsIgnoreCase(ethereumTransaction.getHash))
-          .foreach{ erc20Operation =>
-            erc20OperationPayload(erc20Operation, op).foreach{ payload =>
-              val routingKey = getERC20TransactionRoutingKeys(erc20Operation)
-              rabbitmq.publish(poolName, routingKey, payload)
-            }
-          }
-      }
-    }
-  }
-
-  private def erc20OperationPayload(erc20Operation: ERC20LikeOperation, operation: Operation): Future[Array[Byte]] = {
-    Operations.getErc20View(erc20Operation, operation, wallet, account).map{
-      mapper.writeValueAsBytes(_)
-    }
-  }
-
-  private def operationPayload(op: Operation): Future[Array[Byte]] = {
-    Operations.getView(op, wallet, account).map {
-      mapper.writeValueAsBytes(_)
-    }
-  }
-
   private def accountPayload(): Future[Array[Byte]] = this.synchronized {
     account.accountView(walletName, wallet.getCurrency.currencyView, syncStatus).map {
       mapper.writeValueAsBytes(_)
     }
-  }
-
-  private def getERC20TransactionRoutingKeys(erc20Op: ERC20LikeOperation): List[String] = {
-    List(
-      "transactions",
-      poolName,
-      currencyName,
-      account.getIndex.toString,
-      "erc20",
-      erc20Op.getOperationType.toString.toLowerCase()
-    )
-  }
-
-  private def getTransactionRoutingKeys(op: Operation): List[String] = {
-    List(
-      "transactions",
-      poolName,
-      currencyName,
-      account.getIndex.toString,
-      op.getOperationType.toString.toLowerCase
-    )
   }
 
   private def getAccountRoutingKeys: List[String] = {
