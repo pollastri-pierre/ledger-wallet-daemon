@@ -29,7 +29,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 @Singleton
-class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: AccountSynchronizerManager, rabbitMQ: RabbitMQ) extends DaemonService {
+class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: AccountSynchronizerManager, publisher: Publisher) extends DaemonService {
 
   case class CacheKey(a: AccountInfo, contract: Option[String])
 
@@ -47,7 +47,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
   def accounts(walletInfo: WalletInfo): Future[Seq[AccountView]] = {
     daemonCache.withWallet(walletInfo) { wallet =>
       wallet.accounts.flatMap { as =>
-        as.toList.map{a =>
+        as.toList.map { a =>
           val syncStatus = synchronizerManager.getSyncStatus(AccountInfo(a.getIndex, walletInfo)).get
           a.accountView(walletInfo.walletName, wallet.getCurrency.currencyView, syncStatus)
         }.sequence[Future, AccountView]
@@ -58,7 +58,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
   def account(accountInfo: AccountInfo): Future[Option[AccountView]] = {
     daemonCache.withWallet(accountInfo.walletInfo) { wallet =>
       wallet.account(accountInfo.accountIndex).flatMap(ao =>
-        ao.map{account =>
+        ao.map { account =>
           val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
           account.accountView(accountInfo.walletName, wallet.getCurrency.currencyView, syncStatus)
         }.sequence)
@@ -291,22 +291,24 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
 
   def createAccount(accountCreationBody: AccountDerivationView, walletInfo: WalletInfo): Future[AccountView] =
     daemonCache.withWallet(walletInfo) {
-      w => w.addAccountIfNotExist(accountCreationBody).flatMap{a =>
-        val accountInfo = AccountInfo(a.getIndex, walletInfo)
-        synchronizerManager.registerAccount(a, w, accountInfo)
-        val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
-        a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
-      }
+      w =>
+        w.addAccountIfNotExist(accountCreationBody).flatMap { a =>
+          val accountInfo = AccountInfo(a.getIndex, walletInfo)
+          synchronizerManager.registerAccount(a, w, accountInfo)
+          val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
+          a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
+        }
     }
 
   def createAccountWithExtendedInfo(derivations: AccountExtendedDerivationView, walletInfo: WalletInfo): Future[AccountView] =
     daemonCache.withWallet(walletInfo) {
-      w => w.addAccountIfNotExist(derivations).flatMap{ a =>
-        val accountInfo = AccountInfo(a.getIndex, walletInfo)
-        synchronizerManager.registerAccount(a, w, accountInfo)
-        val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
-        a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
-      }
+      w =>
+        w.addAccountIfNotExist(derivations).flatMap { a =>
+          val accountInfo = AccountInfo(a.getIndex, walletInfo)
+          synchronizerManager.registerAccount(a, w, accountInfo)
+          val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
+          a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
+        }
     }
 
   def repushOperations(accountInfo: AccountInfo, fromHeight: Option[Long]): Future[Unit] = {
@@ -314,13 +316,13 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
       case (account, wallet) =>
         val pushOperationFuture = account.operationsFromHeight(0, Int.MaxValue, 1, fromHeight.getOrElse(0))
           .flatMap { ops =>
-            Future.sequence(ops.map{op => rabbitMQ.publishOperation(op, account, wallet, accountInfo.poolName)}).map(_ => Unit)
+            Future.sequence(ops.map { op => publisher.publishOperation(op, account, wallet, accountInfo.poolName) }).map(_ => Unit)
           }
         val pushErc20Future: Future[Unit] = if (account.isInstanceOfEthereumLikeAccount) {
-          account.erc20Operations.flatMap{ operations =>
-            Future.sequence(operations.map{
+          account.erc20Operations.flatMap { operations =>
+            Future.sequence(operations.map {
               case (operation, erc20Operation) =>
-                rabbitMQ.publishERC20Operation(erc20Operation, operation, account, wallet, accountInfo.poolName)
+                publisher.publishERC20Operation(erc20Operation, operation, account, wallet, accountInfo.poolName)
             })
           }.map(_ => Unit)
         } else Future.unit

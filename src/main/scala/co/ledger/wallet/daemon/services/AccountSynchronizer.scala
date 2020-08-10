@@ -12,13 +12,11 @@ import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.exceptions.AccountNotFoundException
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account._
-import co.ledger.wallet.daemon.models.Currency.RichCoreCurrency
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models.{AccountInfo, Pool, PoolInfo}
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.concurrent.NamedPoolThreadFactory
-import com.twitter.finatra.json.FinatraObjectMapper
 import com.twitter.inject.Logging
 import com.twitter.util.{Duration, ScheduledThreadPoolTimer, Timer}
 import javax.inject.{Inject, Singleton}
@@ -33,7 +31,7 @@ import scala.util.{Success, Try}
   * It's pluggable to external trigger
   */
 @Singleton
-class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, rabbitMQ: RabbitMQ)
+class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, publisher: Publisher)
   extends DaemonService {
 
   // FIXME : ExecutionContext size
@@ -93,7 +91,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, rabbitMQ: R
   def registerAccount(account: Account, wallet: Wallet, accountInfo: AccountInfo): Unit = this.synchronized {
     registeredAccounts.computeIfAbsent(accountInfo, (i: AccountInfo) => {
       info(s"registered account $i to account synchronizer manager")
-      new AccountSynchronizer(account, wallet, poolName = i.poolName, scheduler, rabbitMQ)
+      new AccountSynchronizer(account, wallet, poolName = i.poolName, scheduler, publisher)
     })
   }
 
@@ -183,11 +181,9 @@ class AccountSynchronizer(account: Account,
                           wallet: Wallet,
                           poolName: String,
                           scheduler: Timer,
-                          rabbitmq: RabbitMQ)
+                          publisher: Publisher)
                          (implicit ec: ExecutionContext) extends Logging {
-  private val currencyName = wallet.getCurrency.getName
   private val walletName = wallet.getName
-  private val mapper = FinatraObjectMapper.create()
   // The core of the state machine, any change to it should be this.synchronised
   private var syncStatus: SyncStatus = Synced(0)
   private val syncFuture: AtomicReference[Future[SynchronizationResult]] = new AtomicReference(
@@ -215,8 +211,8 @@ class AccountSynchronizer(account: Account,
           val uid = event.getPayload.getString(OP_ID_EVENT_KEY)
           account.operation(uid, 1).foreach {
             case Some(op) =>
-              rabbitmq.publishOperation(op, account, wallet, poolName)
-              rabbitmq.publishERC20Operation(op, account, wallet, poolName)
+              publisher.publishOperation(op, account, wallet, poolName)
+              publisher.publishERC20Operation(op, account, wallet, poolName)
             case _ =>
           }
         case _ =>
@@ -224,20 +220,6 @@ class AccountSynchronizer(account: Account,
     }
   }
 
-  private def accountPayload(): Future[Array[Byte]] = this.synchronized {
-    account.accountView(walletName, wallet.getCurrency.currencyView, syncStatus).map {
-      mapper.writeValueAsBytes(_)
-    }
-  }
-
-  private def getAccountRoutingKeys: List[String] = {
-    List(
-      "accounts",
-      poolName,
-      currencyName,
-      account.getIndex.toString
-    )
-  }
 
   account.getEventBus.subscribe(LedgerCoreExecutionContext(ec), eventReceiver)
 
@@ -367,10 +349,9 @@ class AccountSynchronizer(account: Account,
 
   private def onSynchronizationEnds(): Unit = this.synchronized {
     info(s"SYNC : $accountInfo has been synced : $syncStatus")
-    accountPayload().foreach { payload =>
-      rabbitmq.publish(poolName, getAccountRoutingKeys, payload)
-    }
+    publisher.publishAccount(account, wallet, poolName, syncStatus)
   }
+
 
   private def accountInfo: String = {
     s"$poolName/$walletName/${account.getIndex}"

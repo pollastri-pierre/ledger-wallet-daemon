@@ -251,7 +251,7 @@ object DaemonConfiguration extends Logging {
     }
   }
 
-  val rabbitMQUri: String = config.getString("rabbitmq.uri")
+  val rabbitMQUri: Try[String] = Try(config.getString("rabbitmq.uri"))
 
   case class ApiConfig(fallbackTimeout: Int, paths: Map[String, PathConfig], proxyUse: Map[Host, Boolean], fees: Map[String, FeesPath])
 
