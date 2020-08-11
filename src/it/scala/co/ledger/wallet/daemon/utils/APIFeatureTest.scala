@@ -66,9 +66,7 @@ trait APIFeatureTest extends FeatureTest {
   }
 
   def assertSyncAccount(poolName: String, walletName: String, accIdx: Int): Response = {
-    val r = server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts/$accIdx/operations/synchronize", "", headers = defaultHeaders, andExpect = Status.Ok)
-    Thread.sleep(10000) // wait a little bit for the sync to finish
-    r
+    server.httpPost(s"/pools/$poolName/wallets/$walletName/accounts/$accIdx/operations/synchronize", "", headers = defaultHeaders, andExpect = Status.Ok)
   }
 
   protected def assertCreateAccount(accountCreationBody: String, poolName: String, walletName: String, expected: Status): Response = {

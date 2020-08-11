@@ -19,6 +19,7 @@ import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models._
+import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.Utils
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, _}
 import com.google.common.cache.{CacheBuilder, CacheLoader}
@@ -83,8 +84,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     *
     * @return a Future of sequence of result of synchronization.
     */
-  def synchronizeAccount(accountInfo: AccountInfo): Unit =
-    synchronizerManager.syncAccount(accountInfo)
+  def synchronizeAccount(accountInfo: AccountInfo): Future[Seq[SynchronizationResult]] =
+    daemonCache.withAccount(accountInfo)(_.sync(accountInfo.poolName, accountInfo.walletName).map(Seq(_)))
 
   def getAccount(accountInfo: AccountInfo): Future[Option[core.Account]] = {
     daemonCache.getAccount(accountInfo: AccountInfo)
