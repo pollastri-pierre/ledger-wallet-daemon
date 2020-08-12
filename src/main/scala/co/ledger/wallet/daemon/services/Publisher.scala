@@ -14,6 +14,8 @@ trait Publisher {
 
   def publishAccount(account: Account, wallet: Wallet, poolName: String, syncStatus: SyncStatus): Future[Unit]
 
+  def publishDeletedOperation(uid: String, account: Account, wallet: Wallet, poolName: String): Future[Unit]
+
   // Publish all the ERC20LikeOperations which the Operation could contain
   def publishERC20Operation(op: Operation, account: Account, wallet: Wallet, poolName: String): Future[Unit] = {
     if (account.isInstanceOfEthereumLikeAccount) {
@@ -57,5 +59,11 @@ class DummyPublisher extends Publisher with Logging {
       info(s"publish account:${account.getIndex}, wallet:${wallet.getName}, pool:$poolName, syncStatus: $syncStatus")
 
     )
+  }
+
+  override def publishDeletedOperation(uid: String, account: Account, wallet: Wallet, poolName: String): Future[Unit] = {
+    Future.successful{
+      info(s"delete operation $uid for account:${account.getIndex}, wallet:${wallet.getName}, pool:$poolName")
+    }
   }
 }

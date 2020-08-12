@@ -54,6 +54,35 @@ class RabbitMQPublisher(rabbitMQUri: String) extends Logging with Publisher {
       publish(poolName, getAccountRoutingKeys(account, wallet, poolName), payload)
     }
   }
+
+  def publishDeletedOperation(uid: String, account: Account, wallet: Wallet, poolName: String): Future[Unit] = {
+    Future{
+      val routingKey = deleteOperationRoutingKeys(account, wallet, poolName)
+      val payload = deleteOperationPayload(uid, account, wallet, poolName)
+      publish(poolName, routingKey, payload)
+    }
+  }
+
+  private def deleteOperationPayload(uid: String, account: Account, wallet: Wallet, poolName: String): Array[Byte] = {
+    val map: Map[String, Any] = Map(
+      "uid" -> uid,
+      "account" -> account.getIndex(),
+      "wallet" -> wallet.getName(),
+      "poolName" -> poolName
+    )
+    mapper.writeValueAsBytes(map)
+  }
+
+  private def deleteOperationRoutingKeys(account: Account, wallet: Wallet, poolName: String): List[String] = {
+    List(
+      "transactions",
+      poolName,
+      wallet.getName(),
+      account.getIndex().toString(),
+      "delete"
+    )
+  }
+  
   private def accountPayload(account: Account, wallet: Wallet, syncStatus: SyncStatus): Future[Array[Byte]] = this.synchronized {
     account.accountView(wallet.getName, wallet.getCurrency.currencyView, syncStatus).map {
       mapper.writeValueAsBytes(_)

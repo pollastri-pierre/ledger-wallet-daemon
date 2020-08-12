@@ -215,6 +215,9 @@ class AccountSynchronizer(account: Account,
               publisher.publishERC20Operation(op, account, wallet, poolName)
             case _ =>
           }
+        case EventCode.DELETED_OPERATION =>
+          val uid = event.getPayload().getString(Account.EV_DELETED_OP_UID)
+          publisher.publishDeletedOperation(uid, account, wallet, poolName)
         case _ =>
       }
     }
