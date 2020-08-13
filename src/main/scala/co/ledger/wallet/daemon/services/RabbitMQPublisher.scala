@@ -82,7 +82,7 @@ class RabbitMQPublisher(rabbitMQUri: String) extends Logging with Publisher {
       "delete"
     )
   }
-  
+
   private def accountPayload(account: Account, wallet: Wallet, syncStatus: SyncStatus): Future[Array[Byte]] = this.synchronized {
     account.accountView(wallet.getName, wallet.getCurrency.currencyView, syncStatus).map {
       mapper.writeValueAsBytes(_)
