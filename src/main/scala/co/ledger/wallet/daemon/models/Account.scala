@@ -351,7 +351,7 @@ object Account extends Logging {
         } yield {
           a.asEthereumLikeAccount()
             .buildTransaction()
-            .setGasLimit(c.convertAmount(gasLimit))
+            .setGasLimit(c.convertAmount((BigDecimal(gasLimit) * BigDecimal(DaemonConfiguration.ETH_SMART_CONTRACT_GAS_LIMIT_FACTOR)).setScale(0, BigDecimal.RoundingMode.CEILING).toBigInt()))
             .sendToAddress(c.convertAmount(0), contract)
             .setInputData(inputData)
         }
