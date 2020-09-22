@@ -20,6 +20,7 @@ import co.ledger.wallet.daemon.models.coins._
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.utils.HexUtils
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, RichCoreBigInt}
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.common.primitives.UnsignedInteger
 import com.twitter.inject.Logging
@@ -344,7 +345,7 @@ object Account extends Logging {
         } yield {
           a.asEthereumLikeAccount()
             .buildTransaction()
-            .setGasLimit(c.convertAmount(gasLimit))
+            .setGasLimit(c.convertAmount((BigDecimal(gasLimit) * BigDecimal(DaemonConfiguration.ETH_SMART_CONTRACT_GAS_LIMIT_FACTOR)).setScale(0, BigDecimal.RoundingMode.CEILING).toBigInt()))
             .sendToAddress(c.convertAmount(0), contract)
             .setInputData(inputData)
         }
