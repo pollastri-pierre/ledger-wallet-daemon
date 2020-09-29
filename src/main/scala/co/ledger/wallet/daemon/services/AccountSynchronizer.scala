@@ -298,10 +298,7 @@ class AccountSynchronizer(account: Account,
   }
 
   private def lastBlockHeightSync: Long = {
-    val f: Future[Long] = account.firstOperation.map { o =>
-      val optionLong: Option[Long] = o.map(_.getBlockHeight) // walk around for java type conversion
-      optionLong.getOrElse(0L)
-    }
+    val f: Future[Long] = account.getLastBlock().map(_.getHeight)
     Try(Await.result(f, 3.seconds)).getOrElse(-1)
   }
 
