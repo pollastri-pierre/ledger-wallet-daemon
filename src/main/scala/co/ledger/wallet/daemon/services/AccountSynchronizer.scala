@@ -24,7 +24,7 @@ import javax.inject.{Inject, Singleton}
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutorService, Future}
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 /**
   * This module is responsible to maintain account updated
@@ -298,10 +298,7 @@ class AccountSynchronizer(account: Account,
   }
 
   private def lastBlockHeightSync: Long = {
-    val f: Future[Long] = account.firstOperation.map { o =>
-      val optionLong: Option[Long] = o.map(_.getBlockHeight) // walk around for java type conversion
-      optionLong.getOrElse(0L)
-    }
+    val f: Future[Long] = account.getLastBlock().map(_.getHeight)
     Try(Await.result(f, 3.seconds)).getOrElse(-1)
   }
 
@@ -352,7 +349,15 @@ class AccountSynchronizer(account: Account,
 
   private def onSynchronizationEnds(): Unit = this.synchronized {
     info(s"SYNC : $accountInfo has been synced : $syncStatus")
-    publisher.publishAccount(account, wallet, poolName, syncStatus)
+    val publish = for {
+      _ <- publisher.publishAccount(account, wallet, poolName, syncStatus)
+      _ <- if (account.isInstanceOfEthereumLikeAccount) publisher.publishERC20Accounts(account, wallet, poolName, syncStatus)
+           else Future.unit
+    } yield ()
+    Try(Await.result(publish, 10.seconds)) match {
+      case Failure(exception) => error(s"could not send account messages on $accountInfo with error ${exception.getMessage}")
+      case Success(_) => info(s"success in pushing account updates for $accountInfo")
+    }
   }
 
 
