@@ -24,6 +24,7 @@ import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.math.BigDecimal
 
 object Account extends Logging {
 
@@ -362,15 +363,20 @@ object Account extends Logging {
             case _: InvalidEIP55FormatException => Future.failed(InvalidEIP55Format(ti.recipient))
             case _: NotEnoughFundsException => Future.failed(ERC20BalanceNotEnough(contract, 0, ti.amount))
           }
+
           gasLimit <- ti.gasLimit match {
             case Some(amount) => Future.successful(amount)
             case None => ClientFactory.apiClient.getGasLimit(
-              c, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
+                c, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData)
+            ).map {
+              v => (BigDecimal(v) * BigDecimal(DaemonConfiguration.ETH_SMART_CONTRACT_GAS_LIMIT_FACTOR))
+                .setScale(0, BigDecimal.RoundingMode.CEILING).toBigInt()
+            }
           }
         } yield {
           a.asEthereumLikeAccount()
             .buildTransaction()
-            .setGasLimit(c.convertAmount((BigDecimal(gasLimit) * BigDecimal(DaemonConfiguration.ETH_SMART_CONTRACT_GAS_LIMIT_FACTOR)).setScale(0, BigDecimal.RoundingMode.CEILING).toBigInt()))
+            .setGasLimit(c.convertAmount(gasLimit))
             .sendToAddress(c.convertAmount(0), contract)
             .setInputData(inputData)
         }
