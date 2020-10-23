@@ -20,6 +20,7 @@ import co.ledger.wallet.daemon.models.coins._
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.utils.HexUtils
 import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, RichCoreBigInt}
+import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.common.primitives.UnsignedInteger
 import com.twitter.inject.Logging
@@ -27,6 +28,7 @@ import com.twitter.inject.Logging
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.math.BigDecimal
 
 object Account extends Logging {
 
@@ -336,10 +338,15 @@ object Account extends Logging {
             case _: InvalidEIP55FormatException => Future.failed(InvalidEIP55Format(ti.recipient))
             case _: NotEnoughFundsException => Future.failed(ERC20BalanceNotEnough(contract, 0, ti.amount))
           }
+
           gasLimit <- ti.gasLimit match {
             case Some(amount) => Future.successful(amount)
             case None => ClientFactory.apiClient.getGasLimit(
-              c, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData))
+                c, ti.contract.getOrElse(ti.recipient), Some(erc20Account.getAddress), Some(inputData)
+            ).map {
+              v => (BigDecimal(v) * BigDecimal(DaemonConfiguration.ETH_SMART_CONTRACT_GAS_LIMIT_FACTOR))
+                .setScale(0, BigDecimal.RoundingMode.CEILING).toBigInt()
+            }
           }
         } yield {
           a.asEthereumLikeAccount()
