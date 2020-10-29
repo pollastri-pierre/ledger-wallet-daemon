@@ -7,7 +7,6 @@ import com.twitter.util.{ScheduledThreadPoolTimer, Timer}
 
 import scala.concurrent.ExecutionContext
 
-
 object AccountSyncModule extends AbstractModule {
   type PoolName = String
   type AccountSynchronizerFactory = (Account, Wallet, PoolName, ExecutionContext) => AccountSynchronizer
@@ -21,7 +20,6 @@ object AccountSyncModule extends AbstractModule {
   def providesAccountSynchronizer(publisher: Publisher, scheduler : Timer) : AccountSynchronizerFactory = {
     (a, w, p, ec) => new AccountSynchronizer(a, w, p, scheduler, publisher)(ec)
   }
-
 
   override def configure(): Unit = ()
 }
