@@ -120,7 +120,6 @@ object Account extends Logging {
       Account.operations(offset, batch, fullOp, opQuery)
     }
 
-
     def freshAddresses(implicit ec: ExecutionContext): Future[Seq[core.Address]] =
       Account.freshAddresses(a)
 
@@ -132,7 +131,7 @@ object Account extends Logging {
   }
 
   def balance(a: core.Account)(implicit ex: ExecutionContext): Future[scala.BigInt] = a.getBalance().map { b =>
-    debug(s"Account ${a.getIndex}, balance: $b")
+    debug(s"Account ${a.getWalletType}:${a.getIndex}, balance: $b")
     b.toBigInt.asScala
   }
 

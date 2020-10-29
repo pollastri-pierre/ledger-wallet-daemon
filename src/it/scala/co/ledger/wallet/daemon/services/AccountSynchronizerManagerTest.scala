@@ -1,5 +1,6 @@
 package co.ledger.wallet.daemon.services
 
+import co.ledger.wallet.daemon.modules.PublisherModule.OperationsPublisherFactory
 import com.twitter.util.{Duration, Time, Timer, TimerTask}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mockito.MockitoSugar
@@ -12,7 +13,6 @@ import scala.language.postfixOps
 class AccountSynchronizerManagerTest extends FlatSpec with MockitoSugar with DefaultDaemonCacheDatabaseInitializer with Matchers with ScalaFutures {
 
   implicit val timeout : FiniteDuration = 1 minute
-
 
   "AccountSynchronizerManager.start" should "register accounts and schedule a periodic registration" in {
 
@@ -28,7 +28,7 @@ class AccountSynchronizerManagerTest extends FlatSpec with MockitoSugar with Def
       override def stop(): Unit = ()
     }
 
-    val manager = new AccountSynchronizerManager(defaultDaemonCache, { (_, _, _, _) => mock[AccountSynchronizer] }, scheduler)
+    val manager = new AccountSynchronizerManager(defaultDaemonCache, { (_, _, _, _) => mock[AccountSynchronizer] }, mock[OperationsPublisherFactory], scheduler)
 
     manager.start().futureValue
 
@@ -44,17 +44,9 @@ class AccountSynchronizerManagerTest extends FlatSpec with MockitoSugar with Def
 
     new AccountSynchronizerManager(defaultDaemonCache, { (_, _, _, _) =>
       numberOfSynchronizerCreated += 1
-      mock[AccountSynchronizer] }, mock[Timer]).start().futureValue
+      mock[AccountSynchronizer] }, mock[OperationsPublisherFactory], mock[Timer]).start().futureValue
 
     numberOfSynchronizerCreated should be >= 1
   }
 
 }
-
-
-
-
-
-
-
-
