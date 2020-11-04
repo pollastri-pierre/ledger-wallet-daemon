@@ -1,15 +1,15 @@
 package co.ledger.wallet.daemon.services
 
+import akka.actor.{ActorRef, ActorSystem, Props}
 import co.ledger.core.{Account, Wallet}
+import co.ledger.wallet.daemon.modules.PublisherModule
 import com.google.inject.{AbstractModule, Provides, Singleton}
 import com.twitter.concurrent.NamedPoolThreadFactory
 import com.twitter.util.{ScheduledThreadPoolTimer, Timer}
 
-import scala.concurrent.ExecutionContext
-
 object AccountSyncModule extends AbstractModule {
   type PoolName = String
-  type AccountSynchronizerFactory = (Account, Wallet, PoolName, ExecutionContext) => AccountSynchronizer
+  type AccountSynchronizerFactory = (Account, Wallet, PoolName) => ActorRef
 
   @Provides def providesTimer: Timer = new ScheduledThreadPoolTimer(
     poolSize = 1,
@@ -17,8 +17,8 @@ object AccountSyncModule extends AbstractModule {
   )
 
   @Provides @Singleton
-  def providesAccountSynchronizer(publisher: Publisher, scheduler : Timer) : AccountSynchronizerFactory = {
-    (a, w, p, ec) => new AccountSynchronizer(a, w, p, scheduler, publisher)(ec)
+  def providesAccountSynchronizer(actorSystem: ActorSystem, publisherFactory : PublisherModule.OperationsPublisherFactory ) : AccountSynchronizerFactory = {
+    (a, w, p ) => actorSystem.actorOf(Props(new AccountSynchronizer(a, w, p, publisherFactory)))
   }
 
   override def configure(): Unit = ()

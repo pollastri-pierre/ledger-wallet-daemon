@@ -17,9 +17,13 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 class AccountOperationsPublisher(account: Account, wallet: Wallet, poolName: PoolName, publisher: Publisher) extends Actor with ActorLogging {
 
-  implicit val ec: ExecutionContextExecutor = this.context.dispatcher
+  private var numberOfReceivedOperations: Int = 0
+
+  implicit val ec: ExecutionContextExecutor = context.system.dispatchers.lookup("akka.wd-blocking-dispatcher")
   private val eventReceiver = new AccountOperationReceiver(self)
   private val accountInfo: String = s"$poolName/${wallet.getName}/${account.getIndex}"
+
+  private val operationsCountSubscribers : scala.collection.mutable.Set[ActorRef] = scala.collection.mutable.Set.empty[ActorRef]
 
   override def preStart(): Unit = {
     log.info(s"Actor $accountInfo is starting, Actor name=${self.path.name}")
@@ -34,13 +38,21 @@ class AccountOperationsPublisher(account: Account, wallet: Wallet, poolName: Poo
   }
 
   override def receive: Receive = LoggingReceive {
+    case SubscribeToOperationsCount(subscriber) => operationsCountSubscribers.add(subscriber)
+
+    case s: SyncStatus if account.isInstanceOfEthereumLikeAccount => publisher.publishERC20Accounts(account, wallet, poolName.name, s)
+    case s: SyncStatus => publisher.publishAccount(account, wallet, poolName.name, s)
+
     case NewOperationEvent(opId) if account.isInstanceOfEthereumLikeAccount =>
+      updateOpreationsCount()
       fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => {
         publisher.publishOperation(op, account, wallet, poolName.name)
         publishERC20Operations(op)
       })
 
-    case NewOperationEvent(opId) => fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
+    case NewOperationEvent(opId) =>
+      updateOpreationsCount()
+      fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
     case DeletedOperationEvent(opId) => publisher.publishDeletedOperation(opId.uid, account, wallet, poolName.name)
     case PublishOperation(op) => publisher.publishOperation(op, account, wallet, poolName.name)
   }
@@ -74,6 +86,13 @@ class AccountOperationsPublisher(account: Account, wallet: Wallet, poolName: Poo
       }
     }
   }
+
+  private def updateOpreationsCount() : Unit = {
+    numberOfReceivedOperations += 1
+    operationsCountSubscribers.foreach( _ ! OperationsCount(numberOfReceivedOperations) )
+  }
+
+
 }
 
 object AccountOperationsPublisher {
@@ -88,9 +107,18 @@ object AccountOperationsPublisher {
 
   private case class PublishOperation(op: OperationView)
 
+  case object SyncEnded
+
+  case object SyncEndedWithFailure
+
+  case class SubscribeToOperationsCount(subscriber: ActorRef)
+
+  case class OperationsCount(count: Int) extends AnyVal
+
   def props(account: Account, wallet: Wallet, poolName: PoolName, publisher: Publisher): Props = Props(new AccountOperationsPublisher(account, wallet, poolName, publisher))
 
   def name(account: Account, wallet: Wallet, poolName: PoolName): String = s"${poolName.name}.${wallet.getName}.${account.getIndex}"
+
 }
 
 class AccountOperationReceiver(eventTarget: ActorRef) extends EventReceiver {

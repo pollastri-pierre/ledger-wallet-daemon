@@ -3,6 +3,7 @@ package co.ledger.wallet.daemon.services
 import co.ledger.core._
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.models.Operations.OperationView
+import com.fasterxml.jackson.annotation.JsonProperty
 import com.twitter.inject.Logging
 
 import scala.collection.JavaConverters._
@@ -30,6 +31,39 @@ trait Publisher {
   def publishDeletedOperation(uid: String, account: Account, wallet: Wallet, poolName: String): Future[Unit]
 
 }
+
+
+sealed trait SyncStatus {
+  def value: String
+}
+
+case class Synced(atHeight: Long) extends SyncStatus {
+  @JsonProperty("value")
+  def value: String = "synced"
+}
+
+case class Syncing(fromHeight: Long, currentHeight: Long) extends SyncStatus {
+  @JsonProperty("value")
+  def value: String = "syncing"
+}
+
+case class FailedToSync(reason: String) extends SyncStatus {
+  @JsonProperty("value")
+  def value: String = "failed"
+}
+
+/*
+ * targetHeight is the height of the most recent operation of the account before the resync.
+ * currentHeight is the height of the most recent operation of the account during resyncing.
+ * they serve as a progress indicator
+ */
+case class Resyncing(@JsonProperty("sync_status_target") targetOpCount: Long,
+                     @JsonProperty("synOperationCounterc_status_current") currentOpCount: Long)
+  extends SyncStatus {
+  @JsonProperty("value")
+  def value: String = "resyncing"
+}
+
 
 // Dummy publisher that do nothing but log
 class DummyPublisher extends Publisher with Logging {

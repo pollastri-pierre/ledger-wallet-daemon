@@ -1,31 +1,34 @@
 package co.ledger.wallet.daemon.services
 
 import java.util.Date
-import java.util.concurrent.atomic.{AtomicLong, AtomicReference}
-import java.util.concurrent.{ConcurrentHashMap, Executors, Semaphore}
+import java.util.concurrent.{ConcurrentHashMap, Executors}
 
+import akka.actor.Status.Failure
+import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Timers}
+import akka.pattern.{ask, pipe}
+import akka.util.Timeout
 import cats.implicits._
 import co.ledger.core._
 import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.exceptions.AccountNotFoundException
-import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.models.{AccountInfo, Pool, PoolInfo}
-import co.ledger.wallet.daemon.modules.PublisherModule.OperationsPublisherFactory
+import co.ledger.wallet.daemon.modules.PublisherModule
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.AccountOperationsPublisher.PoolName
-import com.fasterxml.jackson.annotation.JsonProperty
-import com.twitter.inject.Logging
-import com.twitter.util.{Duration, Timer}
+import co.ledger.wallet.daemon.services.AccountSynchronizer._
+import com.twitter.util.Timer
 import javax.inject.{Inject, Singleton}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutorService, Future}
-import scala.util.{Failure, Success, Try}
+import scala.language.postfixOps
+import scala.util.control.NonFatal
+import scala.util.{Success, Try}
 
 /**
   * This module is responsible to maintain account updated
@@ -34,19 +37,21 @@ import scala.util.{Failure, Success, Try}
   * @param scheduler used to schedule all the operations in ASM
   */
 @Singleton
-class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronizerFactory: AccountSyncModule.AccountSynchronizerFactory, operationsPublisherFactory: OperationsPublisherFactory, scheduler: Timer)
+class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronizerFactory: AccountSyncModule.AccountSynchronizerFactory, scheduler: Timer)
   extends DaemonService {
+
+  import com.twitter.util.Duration
 
   // FIXME : ExecutionContext size
   implicit val synchronizationPool: ExecutionContextExecutorService = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4 * Runtime.getRuntime.availableProcessors()))
 
-  // When we start ASM, we register the existing accounts
+  // When we start ASM, we register the existing accountsSuccess
   // We periodically try to register account just in case there is new account created
   lazy private val periodicRegisterAccount =
   scheduler.schedule(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncAccountRegisterInterval))(registerAccounts)
 
   // the cache to track the AS
-  private val registeredAccounts = new ConcurrentHashMap[AccountInfo, AccountSynchronizer]()
+  private val registeredAccounts = new ConcurrentHashMap[AccountInfo, ActorRef]()
 
   // should be called after the instantiation of this class
   def start(): Future[Unit] = {
@@ -59,17 +64,23 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
 
   // An external control to resync an account
   def resyncAccount(accountInfo: AccountInfo): Unit = {
-    Option(registeredAccounts.get(accountInfo)).foreach(_.resync())
+    Option(registeredAccounts.get(accountInfo)).foreach(_ ! ReSync)
   }
 
-  // An external control to sync an account
-  def syncAccount(accountInfo: AccountInfo): Future[SynchronizationResult] = {
+  // An external control to sync an accountWallet
+  private def syncAccount(accountInfo: AccountInfo): Future[SynchronizationResult] = {
+
     Option(registeredAccounts.get(accountInfo)).fold({
       warn(s"Trying to sync an unregistered account. $accountInfo")
       Future.failed[SynchronizationResult](
         AccountNotFoundException(accountInfo.accountIndex)
       )
-    })(_.eventuallyStartSync())
+    })(forceSync)
+  }
+
+  private def forceSync(synchronizer: ActorRef) = {
+    implicit val timeout: Timeout = Timeout(60 seconds)
+    (ask(synchronizer, ForceSynchronization).mapTo[SynchronizationResult])
   }
 
   def syncPool(poolInfo: PoolInfo): Future[Seq[SynchronizationResult]] =
@@ -97,7 +108,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
 
   def syncAllRegisteredAccounts(): Future[Seq[SynchronizationResult]] =
     Future.sequence(registeredAccounts.asScala.map {
-      case (_, accountSynchronizer) => accountSynchronizer.eventuallyStartSync()
+      case (_, accountSynchronizer) => forceSync(accountSynchronizer)
     }.toSeq)
 
   def registerAccount(account: Account,
@@ -107,8 +118,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
       accountInfo,
       (i: AccountInfo) => {
         info(s"Registered account $i to account synchronizer manager")
-        operationsPublisherFactory(account, wallet, PoolName(i.poolName))
-        synchronizerFactory(account, wallet, i.poolName, synchronizationPool)
+        synchronizerFactory(account, wallet, i.poolName)
       }
     )
   }
@@ -121,10 +131,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
           Future
             .failed[Unit](AccountNotFoundException(accountInfo.accountIndex))
         )(as => {
-          as.close(Duration.fromMinutes(3))
-            .map(
-              _ => info(s"AccountSynchronizer for account $accountInfo Closed")
-            )
+          Future.successful(as ! PoisonPill) // A watcher would ensure the actor death
         })
     }
 
@@ -151,7 +158,11 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
 
   // return None if account info not found
   def getSyncStatus(accountInfo: AccountInfo): Option[SyncStatus] = {
-    Option(registeredAccounts.get(accountInfo)).map(_.getSyncStatus)
+    Option(registeredAccounts.get(accountInfo)).flatMap { synchronizer =>
+      implicit val timeout: Timeout = Timeout(10 seconds)
+      val status = ask(synchronizer, GetStatus).mapTo[SyncStatus]
+      Try(Await.result(status, 10 seconds)).toOption
+    }
   }
 
   // Maybe to be called periodically to discover new account
@@ -182,12 +193,11 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   def close(after: Duration): Unit = {
     periodicRegisterAccount.cancel()
     periodicRegisterAccount.close(after)
-    val closableTasks = Future.sequence(registeredAccounts.asScala.map {
+    registeredAccounts.asScala.foreach {
       case (accountInfo, accountSynchronizer) =>
         info(s"Closing AccountSynchronizer for account $accountInfo")
-        accountSynchronizer.close(after).map(_ => info(s"AccountSynchronizer for account $accountInfo Closed"))
-    })
-    Await.result(closableTasks, after.inMilliseconds.millisecond)
+        accountSynchronizer ! PoisonPill
+    }
   }
 }
 
@@ -200,248 +210,195 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   * |                v       \                   v
   * Syncing(fromHeight)       Resyncing(targetHeight, currentHeight)
   *
-  * @param ec the execution context for the synchronization job
   */
 class AccountSynchronizer(account: Account,
                           wallet: Wallet,
                           poolName: String,
-                          scheduler: Timer,
-                          publisher: Publisher)(implicit ec: ExecutionContext)
-  extends Logging {
+                          createPublisher: PublisherModule.OperationsPublisherFactory) extends Actor with Timers
+  with ActorLogging {
+
+  implicit val ec: ExecutionContext = context.system.dispatchers.lookup(("akka.wd-blocking-dispatcher"))
+
   private val walletName = wallet.getName
-  // The core of the state machine, any change to it should be this.synchronised
-  private var syncStatus: SyncStatus = Synced(0)
-  private val syncFuture: AtomicReference[Future[SynchronizationResult]] =
-    new AtomicReference(
-      Future.successful(
-        SynchronizationResult
-          .apply(account.getIndex, walletName, poolName, syncResult = false)
-      )
-    )
+  private val accountInfo: String = s"$poolName/$walletName/${account.getIndex}"
 
+  private var operationPublisher: ActorRef = ActorRef.noSender
 
-  // When the account is syncing, we received a resync request, we will
-  // put it in queue. There is a synchronizer reading the queue periodically
-  // to start the resync
-  private val resyncLatch = {
-    val s = new Semaphore(1)
-    s.drainPermits()
-    s
+  override def preStart(): Unit = {
+    super.preStart()
+    restartPublisher()
+    self ! Init
   }
 
-  // A counter to count the new operation event that is received.
-  // Used to work with resync to indicate the resync progress
-  private val opCounter: AtomicLong = new AtomicLong()
+  override def postStop(): Unit = {
+    log.info(s"AccountSynchronizer for account $accountInfo Closed")
+  }
 
-  private val incrementOpCounter = new EventReceiver {
-    override def onEvent(event: Event): Unit = {
-      if (event.getCode == EventCode.NEW_OPERATION) {
-        opCounter.incrementAndGet()
-      }
+  override val receive: Receive = uninitialized()
+
+  def uninitialized() : Receive = {
+    case Init => lastAccountBlockHeight.pipeTo(self)
+    case h: BlockHeight => context become idle(lastHeightSeen = h)
+      schedulePeriodSync()
+
+    case GetStatus | ReSync => sender() ! Synced(0)
+    case ForceSynchronization => sender() ! SynchronizationResult(account.getIndex, walletName, poolName, syncResult = false)
+
+    case Failure(t) => log.error(t, s"An error occurred initializing synchro account $accountInfo")
+  }
+
+  private def idle(lastHeightSeen: BlockHeight) : Receive = {
+    case GetStatus => sender() ! Synced(lastHeightSeen.value)
+
+    case ForceSynchronization => context become synchronizing(lastHeightSeen)
+      sync().andThen{ case Success(_) => context become synchronizing(lastHeightSeen) }
+        .pipeTo(self)
+        .map(synchronizationResult)
+        .pipeTo(sender())
+
+    case StartSynchronization => context become synchronizing(lastHeightSeen)
+      sync().andThen{ case scala.util.Failure(_) => idle(lastHeightSeen)  }.pipeTo(self)
+
+    case ReSync => context become resyncing(lastHeightSeen, AccountOperationsPublisher.OperationsCount(0), SynchronizedOperationsCount(0))
+      timers.cancel(StartSynchronization)
+      restartPublisher()
+      operationPublisher ! AccountOperationsPublisher.SubscribeToOperationsCount(self)
+
+      wipeAllOperations()
+        .pipeTo(self)
+        .andThen{ case scala.util.Failure(_) => context become idle(lastHeightSeen) }
+
+    case Failure(t) => log.error(t, s"An error occurred synchro synchronizing account $accountInfo  at height $lastHeightSeen")
+  }
+
+  private def synchronizing(fromHeight: BlockHeight) : Receive = {
+    case GetStatus | ForceSynchronization | StartSynchronization => updatedSyncingStatus(fromHeight).pipeTo(sender())
+    case ReSync => timers.startSingleTimer(StartSynchronization, ReSync, 3 seconds)
+
+    case SyncSuccess(height) => context become idle(lastHeightSeen = height)
+      operationPublisher ! Synced(height.value)
+
+    case SyncFailure(reason) => context become idle(lastHeightSeen = fromHeight)
+      operationPublisher ! FailedToSync(reason)
+
+    case h: BlockHeight => context become synchronizing(fromHeight = h)
+      schedulePeriodSync()
+
+    case Failure(t) => log.error(t, s"An error occurred synchronizing account $accountInfo  from height $fromHeight")
+  }
+
+  private def resyncing(heightBeforeResync: BlockHeight, current: AccountOperationsPublisher.OperationsCount, target: SynchronizedOperationsCount) : Receive = {
+
+    case GetStatus | ForceSynchronization | StartSynchronization => sender() ! Resyncing(targetOpCount = target.value, currentOpCount = current.count)
+    case ReSync =>
+
+    case SyncSuccess(height) => context become idle(lastHeightSeen = height)
+      operationPublisher ! Synced(height.value)
+      schedulePeriodSync()
+
+    case SyncFailure(reason) => context become idle(lastHeightSeen = heightBeforeResync)
+      operationPublisher ! FailedToSync(reason)
+      schedulePeriodSync()
+
+    case c : AccountOperationsPublisher.OperationsCount => context become resyncing(heightBeforeResync, current = c, target)
+
+    case c : SynchronizedOperationsCount => context become resyncing(heightBeforeResync, current, target = c)
+      sync().pipeTo(self)
+
+    case Failure(t) => log.error(t, s"An error occurred resyncing account $accountInfo (${current.count} / ${target.value} ops)")
+  }
+
+  private def lastAccountBlockHeight: Future[BlockHeight] = account.getLastBlock()
+    .map(h => BlockHeight(h.getHeight))
+    .recover {
+      case _: co.ledger.core.implicits.BlockNotFoundException => BlockHeight(0)
     }
+
+  private val synchronizationResult: PartialFunction[SyncResult, SynchronizationResult] = {
+    case SyncSuccess(_) => SynchronizationResult(account.getIndex, walletName, poolName, syncResult = true)
+    case SyncFailure(_) => SynchronizationResult(account.getIndex, walletName, poolName, syncResult = false)
   }
 
-  account.getEventBus.subscribe(LedgerCoreExecutionContext(ec), incrementOpCounter)
+  private def updatedSyncingStatus(atStartTime: BlockHeight) = lastAccountBlockHeight.map(lastHeight => Syncing(atStartTime.value, lastHeight.value))
 
-  // Periodically try to trigger sync. the sync will be triggered when status is Synced
-  private val periodicSyncTask = scheduler.schedule(
-    Duration.fromSeconds(DaemonConfiguration.Synchronization.syncInterval)
-  ) {
-    eventuallyStartSync()
+  private def schedulePeriodSync(): Unit = {
+    val syncInterval = DaemonConfiguration.Synchronization.syncInterval.seconds
+    self ! StartSynchronization // startTimerWithFixedDelay does not seem to send a message on call
+    timers.startTimerWithFixedDelay(StartSynchronization, StartSynchronization, syncInterval)
   }
 
-  // Periodically try to update the current height in resync status.
-  // do nothing if the status is not Resyncing
-  private val periodicResyncStatusCheckTask = scheduler.schedule(
-    Duration
-      .fromSeconds(DaemonConfiguration.Synchronization.syncStatusCheckInterval)
-  ) {
-    periodicUpdateStatus()
-  }
-  // Periodically try to resync. It's competing with periodic sync.
-  // The resync will be triggered when status is Synced and there is a resync latch
-  private val periodicResyncCheckTask = scheduler.schedule(
-    Duration
-      .fromSeconds(DaemonConfiguration.Synchronization.resyncCheckInterval)
-  ) {
-    tryResyncAccount()
-  }
+  private def restartPublisher(): Unit = {
 
-  def getSyncStatus: SyncStatus = this.synchronized(syncStatus.copy)
-
-  // A external control for account resync
-  // the resync will be queued if status is not Resyncing
-  // Won't guarantee the resync will be triggered right away, the resync request
-  // will be processed by a periodic check
-  def resync(): Unit = this.synchronized {
-    syncStatus match {
-      case Resyncing(_, _) =>
-      case _ =>
-        info(s"RESYNC : resync task queued for $accountInfo")
-        resyncLatch.release()
+    if (operationPublisher != ActorRef.noSender ) {
+      operationPublisher ! PoisonPill
     }
+
+    operationPublisher = createPublisher(this.context, account, wallet, PoolName(poolName))
   }
 
   /**
-    * @param awaitOngoingSyncTimeout as ongoing sync cannot be canceled
+    * @return the number of operations that had been synchronized by libcore before wiping
     */
-  def close(awaitOngoingSyncTimeout: Duration): Future[Unit] = {
-    periodicResyncCheckTask.cancel()
-    periodicResyncStatusCheckTask.cancel()
-    periodicSyncTask.cancel()
-    account.getEventBus.unsubscribe(incrementOpCounter)
-    Future(
-      Try(
-        Await.result(
-          syncFuture.get(),
-          awaitOngoingSyncTimeout.inMilliseconds.millisecond
-        )
-      ).fold(
-        t =>
-          s"Failed to await for end of synchronization $accountInfo, status : $syncStatus due to error : $t",
-        r =>
-          s"Successfully ended synchronization of account $accountInfo status : $syncStatus syncResult: $r"
-      )
-    )
+  private def wipeAllOperations() = for {
+    lastKnownOperationsCount <- account.operationCounts.map(_.values.sum)
+    _ = log.info(s"Resync : erased all the operations of account $accountInfo")
+    errorCode <- account.eraseDataSince(new Date(0))
+  } yield {
+    log.info(s"account $accountInfo libcore wipe ended (errorCode : $errorCode ")
+    SynchronizedOperationsCount(lastKnownOperationsCount)
   }
 
-  // This method is called periodically by `periodicSync` task
-  // It can also be triggered by external command
-  // Start a new sync or return the current synchronization future.
-  def eventuallyStartSync(): Future[SynchronizationResult] = this.synchronized {
-    syncStatus match {
-      case Synced(_) | FailedToSync(_) => // do sync
-        val lastHeight = lastBlockHeightSync
-        syncStatus = Syncing(lastHeight, lastHeight)
-        syncFuture.set(syncAccount())
-      case _ => // do nothing
-    }
-    syncFuture.get()
-  }
 
-  // This method is called periodically by `periodicResyncStatusCheck` task
-  private def periodicUpdateStatus() = this.synchronized {
-    syncStatus match {
-      case Resyncing(target, _) =>
-        syncStatus = Resyncing(target, opCounter.get())
-      case Syncing(fromHeight, _) =>
-        val lastHeight = lastBlockHeightSync
-        syncStatus = Syncing(fromHeight, lastHeight)
-      case _ =>
-    }
-  }
+  private def sync(): Future[SyncResult] = {
 
-  private def lastBlockHeightSync: Long = {
-    val f: Future[Long] = account.getLastBlock().map(_.getHeight)
-    Try(Await.result(f, 3.seconds)).getOrElse(-1)
-  }
+    log.info(s"SYNC : start syncing $accountInfo")
 
-  // This method is called periodically by `periodicResyncCheck` task
-  private def tryResyncAccount() = this.synchronized {
-    if (resyncLatch.tryAcquire()) {
-      info(s"RESYNC : try to resync account $accountInfo")
-      syncStatus match {
-        case Synced(_) | FailedToSync(_) => // do resync
-          // await the future to be able to sync syncStatus change
-          val targetOpCounts = Try(
-            Await.result(account.operationCounts.map(_.values.sum), 10.seconds)
-          ).getOrElse(-1)
-          opCounter.set(0)
-          syncStatus = Resyncing(targetOpCounts, 0)
-          info(s"RESYNC : resyncing $accountInfo")
-          val syncTask = for {
-            _ <- account.eraseDataSince(new Date(0))
-            _ = info(s"Resync : erased all the operations of $accountInfo")
-            syncTask <- syncAccount()
-          } yield syncTask
-          syncFuture.set(syncTask)
-        case _ => // queue the resync
-          info(
-            s"RESYNC : the account $accountInfo is being syncing, postpone the resync"
-          )
-          resyncLatch.release()
-      }
-    }
-  }
-
-  private def syncAccount(): Future[SynchronizationResult] = {
-    onSynchronizationStart()
     account
       .sync(poolName, walletName)
-      .andThen {
-        case Success(value) if value.syncResult =>
-          this.synchronized {
-            syncStatus = Synced(lastBlockHeightSync)
-            onSynchronizationEnds()
-          }
-        case _ =>
-          this.synchronized {
-            syncStatus =
-              FailedToSync(s"SYNC : failed to sync account $accountInfo")
-            onSynchronizationEnds()
-          }
+      .flatMap { result =>
+        if (result.syncResult) {
+          log.info(s"SYNC : $accountInfo has been synced : $result")
+          lastAccountBlockHeight.map(SyncSuccess)
+        } else {
+          Future.successful(SyncFailure(s"Lib core failed to sync the account $accountInfo"))
+        }
+      }
+      .recoverWith { case NonFatal(t) =>
+        log.error(t, s"Failed to sync account: $accountInfo")
+        Future.successful(SyncFailure(t.getMessage))
       }
   }
-
-  private def onSynchronizationStart(): Unit = {
-    info(s"SYNC : start syncing $accountInfo")
-  }
-
-  private def onSynchronizationEnds(): Unit = this.synchronized {
-    info(s"SYNC : $accountInfo has been synced : $syncStatus")
-    val publish = for {
-      _ <- publisher.publishAccount(account, wallet, poolName, syncStatus)
-      _ <- if (account.isInstanceOfEthereumLikeAccount) publisher.publishERC20Accounts(account, wallet, poolName, syncStatus)
-      else Future.unit
-    } yield ()
-    Try(Await.result(publish, 10.seconds)) match {
-      case Failure(exception) => error(s"could not send account messages on $accountInfo with error ${exception.getMessage}")
-      case Success(_) => info(s"success in pushing account updates for $accountInfo")
-    }
-  }
-
-  private def accountInfo: String = {
-    s"$poolName/$walletName/${account.getIndex}"
-  }
 }
 
-sealed trait SyncStatus {
-  def value: String
+object AccountSynchronizer {
 
-  def copy: SyncStatus
-}
+  /**
+    * Wipe all the data's account from the database then restart a Sync
+   *  @see co.ledger.wallet.daemon.services.SyncStatus
+    */
+  case object ReSync
 
-case class Synced(atHeight: Long) extends SyncStatus {
-  @JsonProperty("value")
-  def value: String = "synced"
+  /**
+    * Gives the status @SyncStatus of the synchronization of the account
+    */
+  object GetStatus
 
-  override def copy: SyncStatus = Synced(atHeight)
-}
+  /**
+    * Start a new synchronization as soon as possible
+    */
+  case object ForceSynchronization
 
-case class Syncing(fromHeight: Long, currentHeight: Long) extends SyncStatus {
-  @JsonProperty("value")
-  def value: String = "syncing"
+  private case object Init
 
-  override def copy: SyncStatus = Syncing(fromHeight, currentHeight)
-}
+  private case object StartSynchronization
 
-case class FailedToSync(reason: String) extends SyncStatus {
-  @JsonProperty("value")
-  def value: String = "failed"
+  private sealed trait SyncResult
 
-  override def copy: SyncStatus = FailedToSync(reason)
-}
+  private case class SyncSuccess(height: BlockHeight) extends SyncResult
 
-/*
- * targetHeight is the height of the most recent operation of the account before the resync.
- * currentHeight is the height of the most recent operation of the account during resyncing.
- * they serve as a progress indicator
- */
-case class Resyncing(@JsonProperty("sync_status_target") targetOpCount: Long,
-                     @JsonProperty("synOperationCounterc_status_current") currentOpCount: Long)
-  extends SyncStatus {
-  @JsonProperty("value")
-  def value: String = "resyncing"
+  private case class SyncFailure(reason : String) extends SyncResult
 
-  override def copy: SyncStatus = Resyncing(targetOpCount, currentOpCount)
+  private case class BlockHeight(value: Long) extends AnyVal
+
+  private case class SynchronizedOperationsCount(value: Int) extends AnyVal
 }

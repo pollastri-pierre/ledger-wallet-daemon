@@ -1,6 +1,7 @@
 package co.ledger.wallet.daemon.services
 
-import co.ledger.wallet.daemon.modules.PublisherModule.OperationsPublisherFactory
+import akka.actor.ActorRef
+import co.ledger.wallet.daemon.services.AccountSyncModule.AccountSynchronizerFactory
 import com.twitter.util.{Duration, Time, Timer, TimerTask}
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.mockito.MockitoSugar
@@ -28,7 +29,7 @@ class AccountSynchronizerManagerTest extends FlatSpec with MockitoSugar with Def
       override def stop(): Unit = ()
     }
 
-    val manager = new AccountSynchronizerManager(defaultDaemonCache, { (_, _, _, _) => mock[AccountSynchronizer] }, mock[OperationsPublisherFactory], scheduler)
+    val manager = new AccountSynchronizerManager(defaultDaemonCache, mock[AccountSynchronizerFactory], scheduler)
 
     manager.start().futureValue
 
@@ -42,9 +43,9 @@ class AccountSynchronizerManagerTest extends FlatSpec with MockitoSugar with Def
 
     var numberOfSynchronizerCreated = 0
 
-    new AccountSynchronizerManager(defaultDaemonCache, { (_, _, _, _) =>
+    new AccountSynchronizerManager(defaultDaemonCache, { (_, _, _) =>
       numberOfSynchronizerCreated += 1
-      mock[AccountSynchronizer] }, mock[OperationsPublisherFactory], mock[Timer]).start().futureValue
+      mock[ActorRef] }, mock[Timer]).start().futureValue
 
     numberOfSynchronizerCreated should be >= 1
   }
