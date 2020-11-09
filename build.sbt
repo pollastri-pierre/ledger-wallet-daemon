@@ -1,5 +1,5 @@
 name := "wallet-daemon"
-version := "2.9.0-rc.7"
+version := "2.9.0-rc.8"
 organization := "co.ledger"
 scalaVersion := "2.12.10"
 buildInfoPackage := "co.ledger.wallet.daemon"
