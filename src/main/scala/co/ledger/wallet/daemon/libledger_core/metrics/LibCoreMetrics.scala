@@ -15,6 +15,9 @@ object LibCoreMetrics {
 
     val allocations = AllocationMetrics.getObjectAllocations.asScala
 
-    allocations.map(e => AllocationMetric(e._1, e._2)).toList
+    allocations.map(e => AllocationMetric(e._1, e._2))
+      .toList
+      .filter(_.numberOfInstances >= 1000)
+      .sortBy(_.numberOfInstances)
   }
 }
