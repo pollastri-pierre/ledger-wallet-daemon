@@ -17,7 +17,7 @@ import co.ledger.wallet.daemon.models.coins._
 import co.ledger.wallet.daemon.schedulers.observers.{SynchronizationEventReceiver, SynchronizationResult}
 import co.ledger.wallet.daemon.services.SyncStatus
 import co.ledger.wallet.daemon.utils.HexUtils
-import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, RichCoreBigInt}
+import co.ledger.wallet.daemon.utils.Utils.{RichBigInt, RichCoreBigInt, DestroyableOperationQuery}
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.google.common.primitives.UnsignedInteger
 import com.twitter.inject.Logging
@@ -172,7 +172,7 @@ object Account extends Logging {
     } yield ops
 
   private def erc20Operations(w: Wallet, a: core.Account, aErc20: core.ERC20LikeAccount)(implicit ec: ExecutionContext): Future[List[OperationView]] =
-    aErc20.queryOperations().complete().execute().map(_.asScala.toList).map { coreOps =>
+    aErc20.queryOperations().complete().executeAndDestroy().map(_.asScala.toList).map { coreOps =>
       val hashToCoreOps = coreOps.map(coreOp => coreOp.asEthereumLikeOperation().getTransaction.getHash -> coreOp).toMap
       val erc20Ops = aErc20.getOperations.asScala.toList
       erc20Ops.filter(erc20Op => {
@@ -198,7 +198,7 @@ object Account extends Logging {
 
   private def batchedErc20Operations(w: Wallet, acc: Account, a: core.ERC20LikeAccount, offset: Int, batch: Int)
                                     (implicit ec: ExecutionContext): Future[List[OperationView]] =
-    a.queryOperations().offset(offset).limit(batch).addOrder(OperationOrderKey.DATE, true).complete().execute()
+    a.queryOperations().offset(offset).limit(batch).addOrder(OperationOrderKey.DATE, true).complete().executeAndDestroy()
       .map(_.asScala.toList)
       .map { coreOps =>
         val hashToERC20 = a.getOperations.asScala.toList.map(erc20Op => erc20Op.getHash -> erc20Op).toMap
@@ -206,7 +206,7 @@ object Account extends Logging {
       }.flatten
 
   def operationCounts(a: core.Account)(implicit ex: ExecutionContext): Future[Map[core.OperationType, Int]] =
-    a.queryOperations().addOrder(OperationOrderKey.DATE, true).partial().execute().map { os =>
+    a.queryOperations().addOrder(OperationOrderKey.DATE, true).partial().executeAndDestroy().map { os =>
       os.asScala.groupBy(o => o.getOperationType).map { case (optType, opts) => (optType, opts.size) }
     }
 
@@ -472,37 +472,37 @@ object Account extends Logging {
   def operationView(uid: String, fullOp: Int, w: Wallet, a: core.Account)(implicit ec: ExecutionContext): Future[Option[OperationView]] = {
     val q = a.queryOperations()
     q.filter().opAnd(core.QueryFilter.operationUidEq(uid))
-    (if (fullOp > 0) q.complete().execute()
-    else q.partial().execute()).flatMap { ops =>
+    (if (fullOp > 0) q.complete().executeAndDestroy()
+    else q.partial().executeAndDestroy()).flatMap { ops =>
       debug(s"Found ${ops.size()} operation(s) with uid : $uid")
-      ops.asScala.headOption.map(Operations.getView(_, w, a)).sequence
+      ops.asScala.headOption.map(Operations.getViewAndDestroy(_, w, a)).sequence
     }
   }
 
   def firstOperationView(w: Wallet, a: core.Account)(implicit ec: ExecutionContext): Future[Option[OperationView]] = {
-    a.queryOperations().addOrder(OperationOrderKey.DATE, false).limit(1).partial().execute()
+    a.queryOperations().addOrder(OperationOrderKey.DATE, false).limit(1).partial().executeAndDestroy()
       .map { ops =>
         ops.asScala.toList.headOption
-          .map(op => Operations.getView(op, w, a)).sequence
+          .map(op => Operations.getViewAndDestroy(op, w, a)).sequence
       }.flatten
   }
 
   def operationViews(offset: Int, batch: Int, fullOp: Int, query: OperationQuery, wallet: Wallet, a: Account)
                     (implicit ec: ExecutionContext): Future[Seq[OperationView]] = {
     (if (fullOp > 0) {
-      query.addOrder(OperationOrderKey.DATE, true).offset(offset).limit(batch).complete().execute()
+      query.addOrder(OperationOrderKey.DATE, true).offset(offset).limit(batch).complete().executeAndDestroy()
     } else {
-      query.addOrder(OperationOrderKey.DATE, true).offset(offset).limit(batch).partial().execute()
+      query.addOrder(OperationOrderKey.DATE, true).offset(offset).limit(batch).partial().executeAndDestroy()
     }).map { operations =>
-      Future.sequence(operations.asScala.toList.map(op => Operations.getView(op, wallet, a)))
+      Future.sequence(operations.asScala.toList.map(op => Operations.getViewAndDestroy(op, wallet, a)))
     }.flatten
   }
 
   def latestOperationViews(latests: Int, query: OperationQuery, w: Wallet, a: Account)
                           (implicit ec: ExecutionContext): Future[Seq[OperationView]] = {
-    query.addOrder(OperationOrderKey.DATE, true).offset(0).limit(latests).complete().execute()
+    query.addOrder(OperationOrderKey.DATE, true).offset(0).limit(latests).complete().executeAndDestroy()
       .map { operations =>
-        Future.sequence(operations.asScala.toList.map(Operations.getView(_, w, a)))
+        Future.sequence(operations.asScala.toList.map(Operations.getViewAndDestroy(_, w, a)))
       }.flatten
   }
 
