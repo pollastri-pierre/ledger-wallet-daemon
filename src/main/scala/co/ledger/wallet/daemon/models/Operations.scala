@@ -25,7 +25,7 @@ object Operations {
   }
 
   def getErc20View(erc20Operation: core.ERC20LikeOperation, operation: core.Operation, wallet: core.Wallet, account: core.Account): Future[OperationView] = {
-    getView(operation, wallet, account).map { view => getErc20View(erc20Operation, view)}
+    getViewAndDestroy(operation, wallet, account).map { view => getErc20View(erc20Operation, view)}
   }
 
   def getErc20View(erc20Operation: core.ERC20LikeOperation, operation: OperationView): OperationView = {
@@ -59,6 +59,12 @@ object Operations {
       operation.getSelfRecipients.asScala.toList,
       getTransactionView(operation, curFamily)
     )
+  }
+
+  def getViewAndDestroy(operation: core.Operation, wallet: core.Wallet, account: core.Account): Future[OperationView] = {
+    val op = getView(operation, wallet, account)
+    operation.destroy()
+    op
   }
 
   def getTrustIndicatorView(indicator: core.TrustIndicator): TrustIndicatorView = {

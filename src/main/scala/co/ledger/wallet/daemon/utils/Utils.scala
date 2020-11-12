@@ -57,6 +57,15 @@ object Utils {
     def asCoreBigInt: core.BigInt = core.BigInt.fromIntegerString(i.toString(), 10)
   }
 
+  implicit class DestroyableOperationQuery(val opq: core.OperationQuery) extends AnyVal {
+    import co.ledger.core.implicits.RichOperationQuery
+    def executeAndDestroy(): scala.concurrent.Future[java.util.ArrayList[co.ledger.core.Operation]] = {
+      val res = opq.execute()
+      opq.self.destroy()
+      res
+    }
+  }
+
   /**
     * Calculate how many values are expected regarding date interval and period
     * Note that our API is proposing inclusive bound ranges whereas java is proposing exclusive end bounds

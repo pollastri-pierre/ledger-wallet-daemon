@@ -11,7 +11,10 @@ import scala.concurrent.ExecutionContext
 
 class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.ExecutionContext {
 
-  override def execute(runnable: core.Runnable): Unit = ec.execute(() => runnable.run())
+  override def execute(runnable: core.Runnable): Unit = ec.execute(() => {
+    runnable.run()
+    runnable.destroy()
+  })
 
   override def delay(runnable: core.Runnable, millis: Long): Unit = {
     val timer = new Timer()
