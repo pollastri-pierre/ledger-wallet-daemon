@@ -1,7 +1,6 @@
 package co.ledger.wallet.daemon.configurations
 
 import java.net.URL
-import java.util.Locale
 
 import co.ledger.wallet.daemon.utils.NetUtils
 import co.ledger.wallet.daemon.utils.NetUtils.Host
@@ -10,12 +9,10 @@ import com.typesafe.config.ConfigFactory
 import slick.jdbc.JdbcProfile
 
 import scala.collection.JavaConverters._
-import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 object DaemonConfiguration extends Logging {
   private val config = ConfigFactory.load()
-  private val PERMISSION_CREATE_USER: Int = 0x01
   private val DEFAULT_SYNC_INTERVAL: Int = 60 // 60 seconds
   private val DEFAULT_RESYNC_CHECK_INTERVAL: Int = 3 // 5 seconds
   private val DEFAULT_SYNC_STATUS_CHECK_INTERVAL: Int = 3 // 3 seconds
@@ -65,20 +62,6 @@ object DaemonConfiguration extends Logging {
     List[(String, String)]()
   }
 
-  val whiteListUsers: Seq[(String, Int)] = if (config.hasPath("whitelist")) {
-    val usersConfig = config.getConfigList("whitelist")
-    val users = new ListBuffer[(String, Int)]()
-    for (i <- 0 until usersConfig.size()) {
-      val userConfig = usersConfig.get(i)
-      val pubKey = userConfig.getString("key").toUpperCase(Locale.US)
-      val permissions = if (Try(userConfig.getBoolean("account_creation")).getOrElse(false)) PERMISSION_CREATE_USER else 0
-      users += ((pubKey, permissions))
-    }
-    users.toList
-  } else {
-    List[(String, Int)]()
-  }
-
   val dbProfileName: String = Try(config.getString("database_engine")).toOption.getOrElse("sqlite3")
 
   val dbProfile: JdbcProfile = dbProfileName match {
@@ -91,28 +74,26 @@ object DaemonConfiguration extends Logging {
     case others => throw new Exception(s"Unknown database backend $others")
   }
 
-  val isWhiteListDisabled: Boolean = if (!config.hasPath("disable_whitelist")) false else config.getBoolean("disable_whitelist")
-
   object Synchronization {
-    val syncInterval = if (config.hasPath("synchronization.sync_interval_in_seconds")) {
+    val syncInterval: Int = if (config.hasPath("synchronization.sync_interval_in_seconds")) {
       config.getInt("synchronization.sync_interval_in_seconds")
     }
     else {
       DEFAULT_SYNC_INTERVAL
     }
-    val syncAccountRegisterInterval = if (config.hasPath("synchronization.sync_account_register_interval_in_seconds")) {
+    val syncAccountRegisterInterval: Int = if (config.hasPath("synchronization.sync_account_register_interval_in_seconds")) {
       config.getInt("synchronization.sync_account_register_interval_in_seconds")
     }
     else {
       DEFAULT_SYNC_ACCOUNT_REGISTER_INTERVAL
     }
-    val syncStatusCheckInterval = if (config.hasPath("synchronization.sync_status_check_interval_in_seconds")) {
+    val syncStatusCheckInterval: Int = if (config.hasPath("synchronization.sync_status_check_interval_in_seconds")) {
       config.getInt("synchronization.sync_status_check_interval_in_seconds")
     }
     else {
       DEFAULT_SYNC_STATUS_CHECK_INTERVAL
     }
-    val resyncCheckInterval = if (config.hasPath("synchronization.resync_check_interval_in_seconds")) {
+    val resyncCheckInterval: Int = if (config.hasPath("synchronization.resync_check_interval_in_seconds")) {
       config.getInt("synchronization.resync_check_interval_in_seconds")
     }
     else {
@@ -271,4 +252,5 @@ object DaemonConfiguration extends Logging {
   case class FeesPath(path: String)
 
   case class SynchronizationConfig(delay: Int, frequency: Int)
+
 }

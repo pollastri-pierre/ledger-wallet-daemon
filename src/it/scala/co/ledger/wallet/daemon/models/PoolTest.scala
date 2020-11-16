@@ -12,9 +12,9 @@ import scala.concurrent.duration.Duration
 class PoolTest extends AssertionsForJUnit {
 
   NativeLibLoader.loadLibs()
-  private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
+  private val testPool = Pool.newInstance(Pool.newCoreInstance( PoolDto("test_pool", "", Option(0L))), 1L)
   private val notExistingWallet = Await.result(testPool.wallet("not_exist"), Duration.Inf)
-  private val samePool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("test_pool", 1L, "", Option(0L))), Duration.Inf), 1L)
+  private val samePool = Pool.newInstance(Pool.newCoreInstance( PoolDto("test_pool", "", Option(0L))), 1L)
 
   private val wallet = Await.result(testPool.addWalletIfNotExist("test_wallet", "bitcoin", isNativeSegwit = false).flatMap { testWallet =>
     testPool.wallet("test_wallet").flatMap { sameWallet =>

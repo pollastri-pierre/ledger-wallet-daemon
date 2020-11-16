@@ -376,19 +376,19 @@ class AccountsApiTest extends APIFeatureTest {
 
 
   protected def assertGetTokens(poolName: String, walletName: String, idx: Int, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens", andExpect = expected)
   }
 
   protected def assertGetTokensOperation(poolName: String, walletName: String, idx: Int, contractAddress: String, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens/$contractAddress/operations", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens/$contractAddress/operations", andExpect = expected)
   }
 
   protected def assertGetTokensOperation(poolName: String, walletName: String, idx: Int, contractAddress: String, batch: Int, offset: Int, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens/$contractAddress/operations?batch=$batch&offset=$offset", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens/$contractAddress/operations?batch=$batch&offset=$offset", andExpect = expected)
   }
 
   protected def assertGetTokensHistory(poolName: String, walletName: String, idx: Int, contractAddress: String, start: String, end: String, timeInterval: String, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens/$contractAddress/history?start=$start&end=$end&time_interval=$timeInterval", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$idx/tokens/$contractAddress/history?start=$start&end=$end&time_interval=$timeInterval", andExpect = expected)
   }
 
   test("AccountsApi#Create ERC20 ropsten account") {
