@@ -97,8 +97,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
                     AccountInfo(
                       account.getIndex,
                       wallet.getName,
-                      pool.name,
-                      poolInfo.pubKey
+                      pool.name
                     )
                   )
               )
@@ -147,7 +146,6 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
       walletsAccount.map { case (wallet, accounts) =>
         accounts.map(account => {
           val accountInfo = AccountInfo(
-            pubKey = poolInfo.pubKey,
             walletName = wallet.getName,
             poolName = pool.name,
             accountIndex = account.getIndex)
@@ -171,19 +169,17 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   // Maybe to be called periodically to discover new account
   private def registerAccounts: Future[Unit] = {
     for {
-      users <- daemonCache.getUsers
-      pools <- Future.sequence(users.map(u => u.pools().map(_.map(p => (u, p))))).map(_.flatten)
-      wallets <- Future.sequence(pools.map { case (user, pool) => pool.wallets.map(_.map(w => (user, pool, w))) }).map(_.flatten)
-      accounts <- Future.sequence(wallets.map { case (user, pool, wallet) =>
+      pools <- daemonCache.getAllPools
+      wallets <- Future.sequence(pools.map { pool => pool.wallets.map(_.map(w => (pool, w))) }).map(_.flatten)
+      accounts <- Future.sequence(wallets.map { case (pool, wallet) =>
         for {
           accounts <- wallet.accounts
-        } yield accounts.map(account => (user, pool, wallet, account))
+        } yield accounts.map(account => (pool, wallet, account))
       }).map(_.flatten)
     } yield {
       accounts.foreach {
-        case (user, pool, wallet, account) =>
+        case (pool, wallet, account) =>
           val accountInfo = AccountInfo(
-            pubKey = user.pubKey,
             walletName = wallet.getName,
             poolName = pool.name,
             accountIndex = account.getIndex
@@ -249,7 +245,7 @@ class AccountSynchronizer(account: Account,
 
   override val receive: Receive = uninitialized()
 
-  def uninitialized() : Receive = {
+  def uninitialized(): Receive = {
     case Init => lastAccountBlockHeight.pipeTo(self)
     case h: BlockHeight => context become idle(lastHeightSeen = h)
         self ! StartSynchronization
@@ -260,7 +256,7 @@ class AccountSynchronizer(account: Account,
     case Failure(t) => log.error(t, s"An error occurred initializing synchro account $accountInfo")
   }
 
-  private def idle(lastHeightSeen: BlockHeight) : Receive = {
+  private def idle(lastHeightSeen: BlockHeight): Receive = {
     case GetStatus => sender() ! Synced(lastHeightSeen.value)
 
     case ForceSynchronization => context become synchronizing(lastHeightSeen)
@@ -316,9 +312,9 @@ class AccountSynchronizer(account: Account,
       operationPublisher ! FailedToSync(reason)
       scheduleNextSync()
 
-    case c : AccountOperationsPublisher.OperationsCount => context become resyncing(heightBeforeResync, current = c, target)
+    case c: AccountOperationsPublisher.OperationsCount => context become resyncing(heightBeforeResync, current = c, target)
 
-    case c : SynchronizedOperationsCount => context become resyncing(heightBeforeResync, current, target = c)
+    case c: SynchronizedOperationsCount => context become resyncing(heightBeforeResync, current, target = c)
       sync().pipeTo(self)
 
     case Failure(t) => context become idle(lastHeightSeen = heightBeforeResync)
@@ -341,7 +337,7 @@ class AccountSynchronizer(account: Account,
 
   private def restartPublisher(): Unit = {
 
-    if (operationPublisher != ActorRef.noSender ) {
+    if (operationPublisher != ActorRef.noSender) {
       operationPublisher ! PoisonPill
     }
 
@@ -386,7 +382,8 @@ object AccountSynchronizer {
 
   /**
     * Wipe all the data's account from the database then restart a Sync
-   *  @see co.ledger.wallet.daemon.services.SyncStatus
+    *
+    * @see co.ledger.wallet.daemon.services.SyncStatus
     */
   case object ReSync
 
@@ -408,9 +405,10 @@ object AccountSynchronizer {
 
   private case class SyncSuccess(height: BlockHeight) extends SyncResult
 
-  private case class SyncFailure(reason : String) extends SyncResult
+  private case class SyncFailure(reason: String) extends SyncResult
 
   private case class BlockHeight(value: Long) extends AnyVal
 
   private case class SynchronizedOperationsCount(value: Int) extends AnyVal
+
 }

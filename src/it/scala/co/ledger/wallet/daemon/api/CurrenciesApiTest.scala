@@ -47,15 +47,15 @@ class CurrenciesApiTest extends APIFeatureTest {
   }
 
   private def assertCurrency(poolName: String, currencyName: String, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/currencies/$currencyName", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/currencies/$currencyName", andExpect = expected)
   }
 
   private def assertValidateAddress(poolName: String, currencyName: String, address: String, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/currencies/$currencyName/validate?address=$address", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/currencies/$currencyName/validate?address=$address", andExpect = expected)
   }
 
   private def assertCurrencies(poolName: String, expected: Status): Response = {
-    server.httpGet(s"/pools/$poolName/currencies", headers = defaultHeaders, andExpect = expected)
+    server.httpGet(s"/pools/$poolName/currencies", andExpect = expected)
   }
 
   override def beforeAll(): Unit = {

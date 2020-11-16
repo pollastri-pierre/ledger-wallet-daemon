@@ -14,7 +14,7 @@ import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.gl
 import co.ledger.wallet.daemon.clients.{ClientFactory, ScalaHttpClientPool}
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.DaemonCache
-import co.ledger.wallet.daemon.exceptions.{ERC20NotFoundException, FallbackBalanceProviderException, ResyncOnGoingException}
+import co.ledger.wallet.daemon.exceptions.{AccountNotFoundException, ERC20NotFoundException, FallbackBalanceProviderException, ResyncOnGoingException}
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency._
 import co.ledger.wallet.daemon.models.Operations.{OperationView, PackedOperationsView}
@@ -301,13 +301,11 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
   }
 
   private def checkSyncStatus[T](account: AccountInfo)(block: => Future[T]) : Future[T] = {
-
     val status = synchronizerManager.getSyncStatus(account)
-
     status
       .flatMap {
         case Some(Resyncing(targetHeight, currentHeight)) => Future.failed(ResyncOnGoingException(targetHeight, currentHeight))
-        case None => Future.failed(new RuntimeException(s"No sync status found for $account"))
+        case None => Future.failed(AccountNotFoundException(account.accountIndex))
         case _ => Future.successful(())
       }
       .flatMap( _ => block)

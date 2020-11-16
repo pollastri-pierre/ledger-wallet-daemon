@@ -4,7 +4,7 @@ import java.net.URL
 
 import co.ledger.core
 import co.ledger.core.implicits._
-import co.ledger.core.{ConfigurationDefaults, ErrorCode}
+import co.ledger.core.{ConfigurationDefaults, ErrorCode, WalletPool}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.clients.ClientFactory
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
@@ -17,6 +17,7 @@ import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.{HexUtils, Utils}
 import com.fasterxml.jackson.annotation.JsonProperty
+import com.google.common.cache.{CacheLoader, LoadingCache}
 import com.twitter.inject.Logging
 import com.typesafe.config.ConfigFactory
 import org.bitcoinj.core.Sha256Hash
@@ -24,7 +25,8 @@ import slick.jdbc.JdbcBackend.Database
 
 import scala.collection.JavaConverters._
 import scala.collection._
-import scala.concurrent.Future
+import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
 class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
@@ -246,16 +248,37 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
 }
 
 object Pool extends Logging {
+
+  import com.google.common.cache.CacheBuilder
+
+  val poolInstances: LoadingCache[String, core.WalletPool] =
+    CacheBuilder.newBuilder()
+      .build[String, core.WalletPool](new CacheLoader[String, core.WalletPool] {
+        override def load(poolName: String): WalletPool = Await.result(newCoreWalletPool(poolName), Duration.Inf)
+      })
+
   private val config = ConfigFactory.load()
   var preferenceBackend: PostgresPreferenceBackend = _
+
 
   def newInstance(coreP: core.WalletPool, id: Long): Pool = {
     new Pool(coreP, id)
   }
 
-  def newCoreInstance(poolDto: PoolDto): Future[core.WalletPool] = {
-    val builder = core.WalletPoolBuilder.createInstance()
+  def newPoolInstance(poolDto: PoolDto): Option[Pool] = {
+    poolDto.id.fold(
+      Option.empty[Pool]
+    )(id => Some(Pool.newInstance(newCoreInstance(poolDto), id)))
+  }
+
+  def newCoreInstance(poolDto: PoolDto): core.WalletPool = {
+    poolInstances.get(poolDto.name)
+  }
+
+  def newCoreWalletPool(poolName: String): Future[core.WalletPool] = {
     val poolConfig = core.DynamicObject.newInstance()
+    val builder = core.WalletPoolBuilder.createInstance()
+
     Try(config.getString("core_database_engine")).toOption.getOrElse("sqlite3") match {
       case "postgres" =>
         info("Using PostgreSql as core database engine")
@@ -268,11 +291,11 @@ object Pool extends Logging {
         } yield {
           // Ref: postgres://USERNAME:PASSWORD@HOST:PORT/DBNAME
           if (dbPwd.isEmpty) {
-            (s"postgres://$dbUserName@$dbHost:$dbPort/$dbPrefix${poolDto.name}",
-              s"jdbc:postgresql://$dbHost:$dbPort/$dbPrefix${poolDto.name}?user=$dbUserName")
+            (s"postgres://${dbUserName}@${dbHost}:${dbPort}/${dbPrefix}${poolName}",
+              s"jdbc:postgresql://$dbHost:$dbPort/$dbPrefix${poolName}?user=$dbUserName")
           } else {
-            (s"postgres://$dbUserName:$dbPwd@$dbHost:$dbPort/$dbPrefix${poolDto.name}",
-              s"jdbc:postgresql://$dbHost:$dbPort/$dbPrefix${poolDto.name}?user=$dbUserName&password=$dbPwd")
+            (s"postgres://${dbUserName}:${dbPwd}@${dbHost}:${dbPort}/${dbPrefix}${poolName}",
+              s"jdbc:postgresql://$dbHost:$dbPort/$dbPrefix${poolName}?user=$dbUserName&password=$dbPwd")
           }
         }
         dbName match {
@@ -297,14 +320,14 @@ object Pool extends Logging {
       .setWebsocketClient(ClientFactory.webSocketClient)
       .setLogPrinter(new NoOpLogPrinter(ClientFactory.threadDispatcher.getMainExecutionContext, true))
       .setThreadDispatcher(ClientFactory.threadDispatcher)
-      .setPathResolver(new ScalaPathResolver(corePoolId(poolDto.userId, poolDto.name)))
+      .setPathResolver(new ScalaPathResolver(corePoolId(poolName)))
       .setRandomNumberGenerator(new SecureRandomRNG)
       .setConfiguration(poolConfig)
-      .setName(poolDto.name)
+      .setName(poolName)
       .build()
   }
 
-  private def corePoolId(userId: Long, poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"$userId:$poolName".getBytes))
+  private def corePoolId(poolName: String): String = HexUtils.valueOf(Sha256Hash.hash(s"$poolName".getBytes))
 }
 
 case class WalletPoolView(
