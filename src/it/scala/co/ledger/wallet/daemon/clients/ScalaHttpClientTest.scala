@@ -186,7 +186,6 @@ class ScalaHttpClientTest extends AssertionsForJUnit with Logging {
     }
 
     override def destroy(): Unit = {}
-
   }
 
 
