@@ -89,6 +89,4 @@ class PostgresPreferenceBackend @Inject()(db: Database) extends PreferencesBacke
     )
     Await.result(f, 10.seconds)
   }
-
-  override def destroy(): Unit = ()
 }
