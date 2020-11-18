@@ -534,10 +534,11 @@ object Account extends Logging {
   def sync(poolName: String, walletName: String, a: core.Account)(implicit ec: ExecutionContext): Future[SynchronizationResult] = {
     val promise: Promise[SynchronizationResult] = Promise[SynchronizationResult]()
     val receiver: core.EventReceiver = new SynchronizationEventReceiver(a.getIndex, walletName, poolName, promise)
-    a.synchronize().subscribe(LedgerCoreExecutionContext(ec), receiver)
+    val synchronizationBus = a.synchronize()
+    synchronizationBus.subscribe(LedgerCoreExecutionContext(ec), receiver)
     debug(s"Synchronize $a")
     val f = promise.future
-    f onComplete (_ => a.getEventBus.unsubscribe(receiver))
+    f onComplete (_ => synchronizationBus.unsubscribe(receiver))
     f
   }
 
