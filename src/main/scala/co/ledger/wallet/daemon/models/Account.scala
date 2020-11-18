@@ -110,7 +110,7 @@ object Account extends Logging {
 
     def operationViewsFromHeight(offset: Int, batch: Int, fullOp: Int, fromHeight: Long, w: Wallet)(implicit ec: ExecutionContext): Future[Seq[OperationView]] = {
       val opQuery: OperationQuery = a.queryOperations()
-      opQuery.filter().opAnd(QueryFilter.blockHeightGt(fromHeight))
+      opQuery.filter().opAnd(QueryFilter.blockHeightGt(fromHeight).opOr(QueryFilter.blockHeightIsNull()))
       Account.operationViews(offset, batch, fullOp, opQuery, w, a)
     }
 
