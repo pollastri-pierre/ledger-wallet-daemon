@@ -57,12 +57,15 @@ object Utils {
     def asCoreBigInt: core.BigInt = core.BigInt.fromIntegerString(i.toString(), 10)
   }
 
-  implicit class DestroyableOperationQuery(val opq: core.OperationQuery) extends AnyVal {
+  implicit class DestroyableOperationQuery(val opq: core.OperationQuery)extends AnyVal {
     import co.ledger.core.implicits.RichOperationQuery
+    import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
+
     def executeAndDestroy(): scala.concurrent.Future[java.util.ArrayList[co.ledger.core.Operation]] = {
-      val res = opq.execute()
-      opq.self.destroy()
-      res
+      opq.execute().map(res => {
+        opq.destroy()
+        res
+      })
     }
   }
 

@@ -25,7 +25,7 @@ object Operations {
   }
 
   def getErc20View(erc20Operation: core.ERC20LikeOperation, operation: core.Operation, wallet: core.Wallet, account: core.Account): Future[OperationView] = {
-    getViewAndDestroy(operation, wallet, account).map { view => getErc20View(erc20Operation, view)}
+    getViewAndDestroy(operation, wallet, account).map { view => getErc20View(erc20Operation, view) }
   }
 
   def getErc20View(erc20Operation: core.ERC20LikeOperation, operation: OperationView): OperationView = {
@@ -62,9 +62,10 @@ object Operations {
   }
 
   def getViewAndDestroy(operation: core.Operation, wallet: core.Wallet, account: core.Account): Future[OperationView] = {
-    val op = getView(operation, wallet, account)
-    operation.destroy()
-    op
+    getView(operation, wallet, account).map(op => {
+      operation.destroy()
+      op
+    })
   }
 
   def getTrustIndicatorView(indicator: core.TrustIndicator): TrustIndicatorView = {
