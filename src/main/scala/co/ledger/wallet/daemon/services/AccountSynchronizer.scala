@@ -242,8 +242,9 @@ class AccountSynchronizer(account: Account,
   def uninitialized() : Receive = {
     case Init => lastAccountBlockHeight.pipeTo(self)
     case h: BlockHeight => context become idle(lastHeightSeen = h)
-      schedulePeriodSync()
+      scheduleNextSync()
 
+    case StartSynchronization =>
     case GetStatus | ReSync => sender() ! Synced(0)
     case ForceSynchronization => sender() ! SynchronizationResult(account.getIndex, walletName, poolName, syncResult = false)
 
@@ -254,13 +255,13 @@ class AccountSynchronizer(account: Account,
     case GetStatus => sender() ! Synced(lastHeightSeen.value)
 
     case ForceSynchronization => context become synchronizing(lastHeightSeen)
-      sync().andThen{ case Success(_) => context become synchronizing(lastHeightSeen) }
+      sync()
         .pipeTo(self)
         .map(synchronizationResult)
         .pipeTo(sender())
 
     case StartSynchronization => context become synchronizing(lastHeightSeen)
-      sync().andThen{ case scala.util.Failure(_) => idle(lastHeightSeen)  }.pipeTo(self)
+      sync().pipeTo(self)
 
     case ReSync => context become resyncing(lastHeightSeen, AccountOperationsPublisher.OperationsCount(0), SynchronizedOperationsCount(0))
       timers.cancel(StartSynchronization)
@@ -269,46 +270,53 @@ class AccountSynchronizer(account: Account,
 
       wipeAllOperations()
         .pipeTo(self)
-        .andThen{ case scala.util.Failure(_) => context become idle(lastHeightSeen) }
 
-    case Failure(t) => log.error(t, s"An error occurred synchro synchronizing account $accountInfo  at height $lastHeightSeen")
+    case Failure(t) => log.error(t, s"An error occurred synchronizing account $accountInfo  at $lastHeightSeen")
+      scheduleNextSync()
   }
 
   private def synchronizing(fromHeight: BlockHeight) : Receive = {
-    case GetStatus | ForceSynchronization | StartSynchronization => updatedSyncingStatus(fromHeight).pipeTo(sender())
+    case StartSynchronization => // no one is expecting a response. Only the AccountSynchronizer itself can send this message
+    case GetStatus | ForceSynchronization => updatedSyncingStatus(fromHeight).pipeTo(sender())
     case ReSync => timers.startSingleTimer(StartSynchronization, ReSync, 3 seconds)
 
     case SyncSuccess(height) => context become idle(lastHeightSeen = height)
       operationPublisher ! Synced(height.value)
+      scheduleNextSync()
 
     case SyncFailure(reason) => context become idle(lastHeightSeen = fromHeight)
       operationPublisher ! FailedToSync(reason)
+      scheduleNextSync()
 
     case h: BlockHeight => context become synchronizing(fromHeight = h)
-      schedulePeriodSync()
+      scheduleNextSync()
 
-    case Failure(t) => log.error(t, s"An error occurred synchronizing account $accountInfo  from height $fromHeight")
+    case Failure(t) => context become idle(lastHeightSeen = fromHeight)
+      log.error(t, s"An error occurred synchronizing account $accountInfo  from $fromHeight")
+      scheduleNextSync()
   }
 
   private def resyncing(heightBeforeResync: BlockHeight, current: AccountOperationsPublisher.OperationsCount, target: SynchronizedOperationsCount) : Receive = {
-
-    case GetStatus | ForceSynchronization | StartSynchronization => sender() ! Resyncing(targetOpCount = target.value, currentOpCount = current.count)
+    case StartSynchronization => // no one is expecting a response. Only the AccountSynchronizer itself can send this message
+    case GetStatus | ForceSynchronization => sender() ! Resyncing(targetOpCount = target.value, currentOpCount = current.count)
     case ReSync =>
 
     case SyncSuccess(height) => context become idle(lastHeightSeen = height)
       operationPublisher ! Synced(height.value)
-      schedulePeriodSync()
+      scheduleNextSync()
 
     case SyncFailure(reason) => context become idle(lastHeightSeen = heightBeforeResync)
       operationPublisher ! FailedToSync(reason)
-      schedulePeriodSync()
+      scheduleNextSync()
 
     case c : AccountOperationsPublisher.OperationsCount => context become resyncing(heightBeforeResync, current = c, target)
 
     case c : SynchronizedOperationsCount => context become resyncing(heightBeforeResync, current, target = c)
       sync().pipeTo(self)
 
-    case Failure(t) => log.error(t, s"An error occurred resyncing account $accountInfo (${current.count} / ${target.value} ops)")
+    case Failure(t) => context become idle(lastHeightSeen = heightBeforeResync)
+      log.error(t, s"An error occurred resyncing account $accountInfo (${current.count} / ${target.value} ops)")
+      scheduleNextSync()
   }
 
   private def lastAccountBlockHeight: Future[BlockHeight] = account.getLastBlock()
@@ -324,7 +332,7 @@ class AccountSynchronizer(account: Account,
 
   private def updatedSyncingStatus(atStartTime: BlockHeight) = lastAccountBlockHeight.map(lastHeight => Syncing(atStartTime.value, lastHeight.value))
 
-  private def schedulePeriodSync(): Unit = {
+  private def scheduleNextSync(): Unit = {
     val syncInterval = DaemonConfiguration.Synchronization.syncInterval.seconds
     self ! StartSynchronization // startTimerWithFixedDelay does not seem to send a message on call
     timers.startTimerWithFixedDelay(StartSynchronization, StartSynchronization, syncInterval)
