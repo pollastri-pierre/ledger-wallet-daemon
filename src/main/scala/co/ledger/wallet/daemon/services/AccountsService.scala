@@ -3,12 +3,13 @@ package co.ledger.wallet.daemon.services
 import java.net.URL
 import java.util.{Date, UUID}
 
+import cats.data.OptionT
 import cats.instances.future._
 import cats.instances.list._
-import cats.instances.option._
 import cats.syntax.either._
 import cats.syntax.traverse._
 import co.ledger.core
+import co.ledger.core.{Account, Wallet}
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
 import co.ledger.wallet.daemon.clients.{ClientFactory, ScalaHttpClientPool}
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
@@ -45,24 +46,29 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
         }
       })
 
+
+  private def accountView(walletInfo: WalletInfo, wallet: Wallet)(account: Account): Future[Option[AccountView]] = {
+
+    val status: Future[Option[SyncStatus]] = synchronizerManager.getSyncStatus(AccountInfo(account.getIndex, walletInfo))
+    val view: SyncStatus => Future[AccountView] = account.accountView(walletInfo.walletName, wallet.getCurrency.currencyView, _)
+
+    OptionT(status).semiflatMap(view).value
+  }
+
   def accounts(walletInfo: WalletInfo): Future[Seq[AccountView]] = {
     daemonCache.withWallet(walletInfo) { wallet =>
       wallet.accounts.flatMap { as =>
-        as.toList.map { a =>
-          val syncStatus = synchronizerManager.getSyncStatus(AccountInfo(a.getIndex, walletInfo)).get
-          a.accountView(walletInfo.walletName, wallet.getCurrency.currencyView, syncStatus)
-        }.sequence[Future, AccountView]
+        as.map(accountView(walletInfo, wallet)).toList.sequence[Future, Option[AccountView]].map(_.flatten)
       }
     }
   }
 
   def account(accountInfo: AccountInfo): Future[Option[AccountView]] = {
     daemonCache.withWallet(accountInfo.walletInfo) { wallet =>
-      wallet.account(accountInfo.accountIndex).flatMap(ao =>
-        ao.map { account =>
-          val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
-          account.accountView(accountInfo.walletName, wallet.getCurrency.currencyView, syncStatus)
-        }.sequence)
+      (for {
+        a <- OptionT(wallet.account(accountInfo.accountIndex))
+        view <- OptionT(accountView(accountInfo.walletInfo, wallet)(a))
+      } yield view).value
     }
   }
 
@@ -74,7 +80,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     synchronizerManager.resyncAccount(accountInfo)
   }
 
-  def syncStatus(accountInfo: AccountInfo): Option[SyncStatus] = {
+  def syncStatus(accountInfo: AccountInfo): Future[Option[SyncStatus]] = {
     synchronizerManager.getSyncStatus(accountInfo)
   }
 
@@ -89,24 +95,22 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
 
   def getAccount(accountInfo: AccountInfo): Future[Option[core.Account]] = daemonCache.getAccount(accountInfo: AccountInfo)
 
-  def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
-    checkSyncStatus(accountInfo)
+  def getBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = checkSyncStatus(accountInfo) {
     balanceCache.get(CacheKey(accountInfo, contract))
   }
 
-  def getUtxo(accountInfo: AccountInfo, offset: Int, batch: Int): Future[(List[UTXOView], Int)] = {
-    checkSyncStatus(accountInfo)
-    daemonCache.withAccountAndWallet(accountInfo) { (account, wallet) =>
-      for {
-        lastBlockHeight <- wallet.lastBlockHeight
-        count <- account.getUtxoCount
-        utxos <- account.getUtxo(lastBlockHeight, offset, batch)
-      } yield (utxos, count)
-    }
+  def getUtxo(accountInfo: AccountInfo, offset: Int, batch: Int): Future[(List[UTXOView], Int)] = checkSyncStatus(accountInfo) {
+
+      daemonCache.withAccountAndWallet(accountInfo) { (account, wallet) =>
+        for {
+          lastBlockHeight <- wallet.lastBlockHeight
+          count <- account.getUtxoCount
+          utxos <- account.getUtxo(lastBlockHeight, offset, batch)
+        } yield (utxos, count)
+      }
   }
 
-  private def loadBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = {
-    checkSyncStatus(accountInfo)
+  private def loadBalance(contract: Option[String], accountInfo: AccountInfo): Future[BigInt] = checkSyncStatus(accountInfo) {
 
     def runWithFallback(cb: Future[BigInt], url: URL, service: ScalaHttpClientPool, timeout: scala.concurrent.duration.Duration): Future[BigInt] = {
       Future(Await.result(cb, timeout)).recoverWith { case t =>
@@ -140,20 +144,18 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  def getXpub(accountInfo: AccountInfo): Future[String] = {
-    checkSyncStatus(accountInfo)
+  def getXpub(accountInfo: AccountInfo): Future[String] = checkSyncStatus(accountInfo) {
     daemonCache.withAccount(accountInfo) { a => Future.successful(a.getRestoreKey) }
   }
 
-  def getERC20Operations(accountInfo: AccountInfo): Future[List[OperationView]] = {
-    checkSyncStatus(accountInfo)
+  def getERC20Operations(accountInfo: AccountInfo): Future[List[OperationView]] = checkSyncStatus(accountInfo) {
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) => account.erc20Operations(wallet)
     }
   }
 
-  def getBatchedERC20Operations(tokenAccountInfo: TokenAccountInfo, offset: Int, batch: Int): Future[List[OperationView]] = {
-    checkSyncStatus(tokenAccountInfo.accountInfo)
+  def getBatchedERC20Operations(tokenAccountInfo: TokenAccountInfo, offset: Int, batch: Int): Future[List[OperationView]] = checkSyncStatus(tokenAccountInfo.accountInfo) {
+
     daemonCache.withAccountAndWallet(tokenAccountInfo.accountInfo) {
       case (account, wallet) =>
         account.batchedErc20Operations(wallet, tokenAccountInfo.tokenAddress, offset, batch)
@@ -163,16 +165,16 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  def getBatchedERC20Operations(accountInfo: AccountInfo, offset: Int, batch: Int): Future[List[OperationView]] = {
-    checkSyncStatus(accountInfo)
+  def getBatchedERC20Operations(accountInfo: AccountInfo, offset: Int, batch: Int): Future[List[OperationView]] = checkSyncStatus(accountInfo) {
+
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) =>
         account.batchedErc20Operations(wallet, offset, batch)
     }
   }
 
-  def getTokenAccounts(accountInfo: AccountInfo): Future[List[ERC20AccountView]] = {
-    checkSyncStatus(accountInfo)
+  def getTokenAccounts(accountInfo: AccountInfo): Future[List[ERC20AccountView]] = checkSyncStatus(accountInfo) {
+
     daemonCache.withAccount(accountInfo) { account =>
       for {
         erc20Accounts <- account.erc20Accounts.liftTo[Future]
@@ -182,8 +184,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  def getTokenAccount(tokenAccountInfo: TokenAccountInfo): Future[ERC20AccountView] = {
-    checkSyncStatus(tokenAccountInfo.accountInfo)
+  def getTokenAccount(tokenAccountInfo: TokenAccountInfo): Future[ERC20AccountView] = checkSyncStatus(tokenAccountInfo.accountInfo) {
+
     daemonCache.withAccount(tokenAccountInfo.accountInfo) { account =>
       for {
         erc20Account <- account.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future]
@@ -193,26 +195,24 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  def getTokenCoreAccount(tokenAccountInfo: TokenAccountInfo): Future[core.ERC20LikeAccount] = {
-    checkSyncStatus(tokenAccountInfo.accountInfo)
+  def getTokenCoreAccount(tokenAccountInfo: TokenAccountInfo): Future[core.ERC20LikeAccount] = checkSyncStatus(tokenAccountInfo.accountInfo) {
+
     daemonCache.withAccount(tokenAccountInfo.accountInfo)(_.erc20Account(tokenAccountInfo.tokenAddress).liftTo[Future])
   }
 
-  def getTokenCoreAccountBalanceHistory(tokenAccountInfo: TokenAccountInfo, startDate: Date, endDate: Date, period: core.TimePeriod): Future[List[BigInt]] = {
-    checkSyncStatus(tokenAccountInfo.accountInfo)
+  def getTokenCoreAccountBalanceHistory(tokenAccountInfo: TokenAccountInfo, startDate: Date, endDate: Date, period: core.TimePeriod): Future[List[BigInt]] = checkSyncStatus(tokenAccountInfo.accountInfo) {
+
     getTokenCoreAccount(tokenAccountInfo).map(_.getBalanceHistoryFor(startDate, endDate, period).asScala.map(_.asScala).toList)
       .recoverWith({
         case _: ERC20NotFoundException => Future.successful(List.fill(Utils.intervalSize(startDate, endDate, period))(BigInt(0)))
       })
   }
 
-  def accountFreshAddresses(accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = {
-    checkSyncStatus(accountInfo)
+  def accountFreshAddresses(accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = checkSyncStatus(accountInfo) {
     daemonCache.getFreshAddresses(accountInfo)
   }
 
-  def accountAddressesInRange(from: Long, to: Long, accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = {
-    checkSyncStatus(accountInfo)
+  def accountAddressesInRange(from: Long, to: Long, accountInfo: AccountInfo): Future[Seq[FreshAddressView]] = checkSyncStatus(accountInfo) {
     daemonCache.getAddressesInRange(from, to, accountInfo)
   }
 
@@ -225,8 +225,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
   def nextExtendedAccountCreationInfo(accountIndex: Option[Int], walletInfo: WalletInfo): Future[AccountExtendedDerivationView] =
     daemonCache.withWallet(walletInfo)(_.accountExtendedCreation(accountIndex)).map(_.view)
 
-  def accountOperations(queryParams: OperationQueryParams, accountInfo: AccountInfo): Future[PackedOperationsView] = {
-    checkSyncStatus(accountInfo)
+  def accountOperations(queryParams: OperationQueryParams, accountInfo: AccountInfo): Future[PackedOperationsView] = checkSyncStatus(accountInfo) {
+
     (queryParams.next, queryParams.previous) match {
       case (Some(n), _) =>
         // next has more priority, using database batch instead queryParams.batch
@@ -242,10 +242,9 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  def firstOperation(accountInfo: AccountInfo): Future[Option[OperationView]] = {
+  def firstOperation(accountInfo: AccountInfo): Future[Option[OperationView]] = checkSyncStatus(accountInfo) {
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) =>
-        checkSyncStatus(accountInfo)
         account.firstOperationView(wallet)
     }
   }
@@ -256,12 +255,12 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  def accountOperation(uid: String, fullOp: Int, accountInfo: AccountInfo): Future[Option[OperationView]] =
+  def accountOperation(uid: String, fullOp: Int, accountInfo: AccountInfo): Future[Option[OperationView]] = checkSyncStatus(accountInfo) {
     daemonCache.withAccountAndWallet(accountInfo) {
       case (account, wallet) =>
-        checkSyncStatus(accountInfo)
         account.operationView(uid, fullOp, wallet)
     }
+  }
 
   def createAccount(accountCreationBody: AccountDerivationView, walletInfo: WalletInfo): Future[AccountView] =
     daemonCache.withWallet(walletInfo) {
@@ -270,8 +269,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
           val accountInfo = AccountInfo(a.getIndex, walletInfo)
           synchronizerManager.registerAccount(a, w, accountInfo)
 
-          val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
-          a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
+          accountView(walletInfo, w)(a).map(_.get)
         }
     }
 
@@ -281,8 +279,8 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
         w.addAccountIfNotExist(derivations).flatMap { a =>
           val accountInfo = AccountInfo(a.getIndex, walletInfo)
           synchronizerManager.registerAccount(a, w, accountInfo)
-          val syncStatus = synchronizerManager.getSyncStatus(accountInfo).get
-          a.accountView(walletInfo.walletName, w.getCurrency.currencyView, syncStatus)
+
+          accountView(walletInfo, w)(a).map(_.get)
         }
     }
 
@@ -303,11 +301,17 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     }
   }
 
-  private def checkSyncStatus(account: AccountInfo) = {
-    synchronizerManager.getSyncStatus(account).foreach {
-      case Resyncing(targetHeight, currentHeight) => throw ResyncOnGoingException(targetHeight, currentHeight)
-      case _ =>
-    }
+  private def checkSyncStatus[T](account: AccountInfo)(block: => Future[T]) : Future[T] = {
+
+    val status = synchronizerManager.getSyncStatus(account)
+
+    status
+      .flatMap {
+        case Some(Resyncing(targetHeight, currentHeight)) => Future.failed(ResyncOnGoingException(targetHeight, currentHeight))
+        case None => Future.failed(new RuntimeException(s"No sync status found for $account"))
+        case _ => Future.successful(())
+      }
+      .flatMap( _ => block)
   }
 }
 

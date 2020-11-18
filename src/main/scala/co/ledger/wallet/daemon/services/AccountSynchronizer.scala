@@ -7,6 +7,7 @@ import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Timers}
 import akka.pattern.{ask, pipe}
 import akka.util.Timeout
+import cats.data._
 import cats.implicits._
 import co.ledger.core._
 import co.ledger.core.implicits._
@@ -25,10 +26,10 @@ import javax.inject.{Inject, Singleton}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutorService, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Future}
 import scala.language.postfixOps
+import scala.util.Success
 import scala.util.control.NonFatal
-import scala.util.{Success, Try}
 
 /**
   * This module is responsible to maintain account updated
@@ -157,12 +158,14 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   }
 
   // return None if account info not found
-  def getSyncStatus(accountInfo: AccountInfo): Option[SyncStatus] = {
-    Option(registeredAccounts.get(accountInfo)).flatMap { synchronizer =>
-      implicit val timeout: Timeout = Timeout(10 seconds)
-      val status = ask(synchronizer, GetStatus).mapTo[SyncStatus]
-      Try(Await.result(status, 10 seconds)).toOption
-    }
+  def getSyncStatus(accountInfo: AccountInfo): Future[Option[SyncStatus]] = {
+
+    val status = for {
+      synchronizer <- OptionT.fromOption[Future](Option(registeredAccounts.get(accountInfo)))
+      status <- OptionT.liftF(ask(synchronizer, GetStatus)(Timeout(10 seconds)).mapTo[SyncStatus])
+    } yield status
+
+    status.value
   }
 
   // Maybe to be called periodically to discover new account
@@ -217,7 +220,7 @@ class AccountSynchronizer(account: Account,
                           createPublisher: PublisherModule.OperationsPublisherFactory) extends Actor with Timers
   with ActorLogging {
 
-  implicit val ec: ExecutionContext = context.system.dispatchers.lookup(("akka.wd-blocking-dispatcher"))
+  implicit val ec: ExecutionContext = context.dispatcher
 
   private val walletName = wallet.getName
   private val accountInfo: String = s"$poolName/$walletName/${account.getIndex}"
