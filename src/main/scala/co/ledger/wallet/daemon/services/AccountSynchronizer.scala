@@ -334,8 +334,7 @@ class AccountSynchronizer(account: Account,
 
   private def scheduleNextSync(): Unit = {
     val syncInterval = DaemonConfiguration.Synchronization.syncInterval.seconds
-    self ! StartSynchronization // startTimerWithFixedDelay does not seem to send a message on call
-    timers.startTimerWithFixedDelay(StartSynchronization, StartSynchronization, syncInterval)
+    timers.startSingleTimer(StartSynchronization, StartSynchronization, syncInterval)
   }
 
   private def restartPublisher(): Unit = {
