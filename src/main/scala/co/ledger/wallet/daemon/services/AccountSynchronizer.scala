@@ -26,7 +26,7 @@ import javax.inject.{Inject, Singleton}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, ExecutionContextExecutorService, Future}
 import scala.language.postfixOps
 import scala.util.Success
 import scala.util.control.NonFatal
@@ -63,25 +63,25 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
     }
   }
 
+
   // An external control to resync an account
   def resyncAccount(accountInfo: AccountInfo): Unit = {
     Option(registeredAccounts.get(accountInfo)).foreach(_ ! ReSync)
   }
 
-  // An external control to sync an accountWallet
-  private def syncAccount(accountInfo: AccountInfo): Future[SynchronizationResult] = {
+  def syncAccount(accountInfo: AccountInfo): Future[SynchronizationResult] = {
 
     Option(registeredAccounts.get(accountInfo)).fold({
       warn(s"Trying to sync an unregistered account. $accountInfo")
       Future.failed[SynchronizationResult](
         AccountNotFoundException(accountInfo.accountIndex)
       )
-    })(forceSync)
+    })(forceSync(_).map(synchronizationResult(accountInfo)))
   }
 
   private def forceSync(synchronizer: ActorRef) = {
     implicit val timeout: Timeout = Timeout(60 seconds)
-    (ask(synchronizer, ForceSynchronization).mapTo[SynchronizationResult])
+    (ask(synchronizer, ForceSynchronization).mapTo[SyncStatus])
   }
 
   def syncPool(poolInfo: PoolInfo): Future[Seq[SynchronizationResult]] =
@@ -109,7 +109,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
 
   def syncAllRegisteredAccounts(): Future[Seq[SynchronizationResult]] =
     Future.sequence(registeredAccounts.asScala.map {
-      case (_, accountSynchronizer) => forceSync(accountSynchronizer)
+      case (accountInfo, accountSynchronizer) => forceSync(accountSynchronizer).map(synchronizationResult(accountInfo))
     }.toSeq)
 
   def registerAccount(account: Account,
@@ -202,6 +202,16 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
         accountSynchronizer ! PoisonPill
     }
   }
+
+  private def synchronizationResult(accountInfo: AccountInfo)(syncStatus: SyncStatus) : SynchronizationResult = {
+
+    val syncResult = SynchronizationResult(accountInfo.accountIndex, accountInfo.walletName, accountInfo.poolName, _)
+
+    syncStatus match {
+      case Synced(_) => syncResult(true)
+      case _ => syncResult(false)
+    }
+  }
 }
 
 /**
@@ -254,10 +264,8 @@ class AccountSynchronizer(account: Account,
     case GetStatus => sender() ! Synced(lastHeightSeen.value)
 
     case ForceSynchronization => context become synchronizing(lastHeightSeen)
-      sync()
-        .pipeTo(self)
-        .map(synchronizationResult)
-        .pipeTo(sender())
+      sync().pipeTo(self)
+      sender() ! updatedSyncingStatus(lastHeightSeen)
 
     case StartSynchronization => context become synchronizing(lastHeightSeen)
       sync().pipeTo(self)
@@ -323,11 +331,6 @@ class AccountSynchronizer(account: Account,
     .recover {
       case _: co.ledger.core.implicits.BlockNotFoundException => BlockHeight(0)
     }
-
-  private val synchronizationResult: PartialFunction[SyncResult, SynchronizationResult] = {
-    case SyncSuccess(_) => SynchronizationResult(account.getIndex, walletName, poolName, syncResult = true)
-    case SyncFailure(_) => SynchronizationResult(account.getIndex, walletName, poolName, syncResult = false)
-  }
 
   private def updatedSyncingStatus(atStartTime: BlockHeight) = lastAccountBlockHeight.map(lastHeight => Syncing(atStartTime.value, lastHeight.value))
 

@@ -90,8 +90,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     *
     * @return a Future of sequence of result of synchronization.
     */
-  def synchronizeAccount(accountInfo: AccountInfo): Future[Seq[SynchronizationResult]] =
-    daemonCache.withAccount(accountInfo)(_.sync(accountInfo.poolName, accountInfo.walletName).map(Seq(_)))
+  def synchronizeAccount(accountInfo: AccountInfo): Future[Seq[SynchronizationResult]] = synchronizerManager.syncAccount(accountInfo).map(Seq(_))
 
   def getAccount(accountInfo: AccountInfo): Future[Option[core.Account]] = daemonCache.getAccount(accountInfo: AccountInfo)
 
