@@ -14,8 +14,6 @@ import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
 import co.ledger.wallet.daemon.libledger_core.crypto.SecureRandomRNG
 import co.ledger.wallet.daemon.libledger_core.debug.NoOpLogPrinter
 import co.ledger.wallet.daemon.libledger_core.filesystem.ScalaPathResolver
-import co.ledger.wallet.daemon.models.Wallet._
-import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.{HexUtils, Utils}
 import com.fasterxml.jackson.annotation.JsonProperty
@@ -191,19 +189,6 @@ class Pool(private val coreP: core.WalletPool, val id: Long) extends Logging {
       eventReceivers.remove(eventReceiver)
       debug(s"Unregister $eventReceiver")
     }
-  }
-
-  /**
-    * Synchronize all accounts within this pool.
-    *
-    * @return a future of squence of synchronization results.
-    */
-  def sync(): Future[Seq[SynchronizationResult]] = {
-    for {
-      count <- coreP.getWalletCount()
-      wallets <- coreP.getWallets(0, count)
-      result <- Future.sequence(wallets.asScala.map { wallet => wallet.syncAccounts(name) }).map(_.flatten)
-    } yield result
   }
 
   override def equals(that: Any): Boolean = {

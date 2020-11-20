@@ -9,7 +9,7 @@ import co.ledger.wallet.daemon.exceptions._
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Operations.PackedOperationsView
 import co.ledger.wallet.daemon.models._
-import co.ledger.wallet.daemon.schedulers.observers.{NewOperationEventReceiver, SynchronizationResult}
+import co.ledger.wallet.daemon.schedulers.observers.NewOperationEventReceiver
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import com.twitter.inject.Logging
 import javax.inject.Singleton
@@ -26,12 +26,6 @@ class DefaultDaemonCache() extends DaemonCache with Logging {
 
   def dbMigration: Future[Unit] = {
     dbDao.migrate()
-  }
-
-  def syncOperations(): Future[Seq[SynchronizationResult]] = {
-    getUsers.flatMap { us =>
-      Future.sequence(us.map { user => user.sync() }).map(_.flatten)
-    }
   }
 
   def getUser(pubKey: String): Future[Option[User]] = {
@@ -120,13 +114,6 @@ object DefaultDaemonCache extends Logging {
     private[this] val cachedPools: concurrent.Map[String, Pool] = new ConcurrentHashMap[String, Pool]().asScala
     private[this] val self = this
 
-    def sync(): Future[Seq[SynchronizationResult]] = {
-      pools().flatMap { pls =>
-        Future.sequence(pls.map { p =>
-          p.sync()
-        }).map(_.flatten)
-      }
-    }
 
     /**
       * Delete pool will:
