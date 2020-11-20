@@ -42,7 +42,6 @@ class PoolTest extends AssertionsForJUnit {
     assert(count == 1)
     assert(wallets.size == 1)
     assert(List((wallet.getName, wallet.getCurrency.getName)) == wallets.map( w => (w.getName, w.getCurrency.getName)))
-    assert(Await.result(testPool.sync(), Duration.Inf).isEmpty)
   }
 
 }

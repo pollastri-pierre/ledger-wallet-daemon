@@ -26,7 +26,7 @@ import javax.inject.{Inject, Singleton}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, ExecutionContextExecutorService, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutorService, Future}
 import scala.language.postfixOps
 import scala.util.Success
 import scala.util.control.NonFatal

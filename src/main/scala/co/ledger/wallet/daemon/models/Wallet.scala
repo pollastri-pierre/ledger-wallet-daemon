@@ -5,7 +5,6 @@ import co.ledger.core.implicits._
 import co.ledger.wallet.daemon.exceptions.CoreBadRequestException
 import co.ledger.wallet.daemon.models.Account.{Derivation, ExtendedDerivation, _}
 import co.ledger.wallet.daemon.models.Currency._
-import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.LogMsgMaker
 import co.ledger.wallet.daemon.utils.HexUtils
 import co.ledger.wallet.daemon.utils.Utils._
@@ -41,8 +40,6 @@ object Wallet extends Logging {
     def addAccountIfNotExist(accountDerivations: AccountDerivationView)
                             (implicit ec: ExecutionContext): Future[core.Account] =
       Wallet.addAccountIfNotExist(accountDerivations, w)
-
-    def syncAccounts(poolName: String)(implicit ec: ExecutionContext): Future[Seq[SynchronizationResult]] = Wallet.syncAccounts(poolName, w)
   }
 
   def lastBlockHeight(w: core.Wallet)(implicit ec: ExecutionContext): Future[Long] = {
@@ -131,12 +128,6 @@ object Wallet extends Logging {
         } yield a
     }.map { coreA =>
       coreA
-    }
-  }
-
-  def syncAccounts(poolName: String, w: core.Wallet)(implicit ec: ExecutionContext): Future[Seq[SynchronizationResult]] = {
-    accounts(w).flatMap { accounts =>
-      Future.sequence(accounts.map { account => account.sync(poolName, w.getName) })
     }
   }
 
