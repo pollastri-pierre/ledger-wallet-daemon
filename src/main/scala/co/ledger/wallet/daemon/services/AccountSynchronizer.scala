@@ -242,8 +242,7 @@ class AccountSynchronizer(account: Account,
   def uninitialized() : Receive = {
     case Init => lastAccountBlockHeight.pipeTo(self)
     case h: BlockHeight => context become idle(lastHeightSeen = h)
-      scheduleNextSync()
-
+        self ! StartSynchronization
     case StartSynchronization =>
     case GetStatus | ReSync => sender() ! Synced(0)
     case ForceSynchronization => sender() ! SynchronizationResult(account.getIndex, walletName, poolName, syncResult = false)
