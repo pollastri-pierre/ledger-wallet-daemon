@@ -70,7 +70,7 @@ object PostgresPreferenceBackendTest extends Logging {
   private val dbHost = config.getString("postgres.host")
   private val dbUserName = config.getString("postgres.username")
   private val dbPwd = config.getString("postgres.password")
-  private val dbPrefix = config.getString("postgres.db_name_prefix")
+  private val dbPrefix = config.getString("postgres.core.db_name_prefix")
   private val dbName = dbPrefix + "preferenceBackendTest"
 
   private val db = Database.forURL(

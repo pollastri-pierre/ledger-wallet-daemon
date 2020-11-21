@@ -283,7 +283,7 @@ object Pool extends Logging {
             builder.setExternalPreferencesBackend(preferenceBackend)
             builder.setInternalPreferencesBackend(preferenceBackend)
             poolConfig.putString("DATABASE_NAME", cppUrl)
-            val backend = core.DatabaseBackend.getPostgreSQLBackend(config.getInt("postgres.pool_size"))
+            val backend = core.DatabaseBackend.getPostgreSQLBackend(config.getInt("postgres.core.pool_size"))
             builder.setDatabaseBackend(backend)
           case Failure(exception) =>
             throw CoreDatabaseException("Failed to configure wallet daemon's core database", exception)

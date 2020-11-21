@@ -26,7 +26,7 @@ core = {
 }
 
 # Default postgres configuration
-# Please note there is 2 kind of databases : the Wallet Daemon one (db_name)
+# Please note there is 2 kind of databases : the Wallet Daemon one (wallet_daemon.db_name) and libcore ones (one per pool (`postgres.core.db_name_prefix``poolName`)
 postgres = {
     # Host and port for postgres server
     host = "localhost"
@@ -439,7 +439,7 @@ native_segwit_currencies = ["bitcoin", "bitcoin_testnet", "litecoin", "qtum"]
 native_segwit_currencies = ${?NATIVE_SEGWIT_CURRENCIES}
 
 # Default user for tests
-demo_users = [
+default_users = [
   {
     username = "admin"
     password = "password"
