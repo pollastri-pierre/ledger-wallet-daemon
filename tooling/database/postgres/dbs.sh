@@ -7,6 +7,8 @@ pwd=$4
 prefix=$5
 drop_mode=$6
 
+export PGPASSWORD=$pwd
+
 command=createdb
 if [ -n "$drop_mode" ]; then
 echo "!!!!!!!!!!!!!!!!!!!!!"
@@ -18,7 +20,7 @@ fi
 echo "==> PostgreSQL server infos: host " $host ", port " $port
 
 echo "     * Creating database : wallet_daemon"
-$command -h $host -p $port wallet_daemon -w -U $user
+$command -h $host -p $port wallet_daemon -U $user
 echo "     |--> wallet_daemon Done"
 
 # Databases used in IT tests
@@ -28,7 +30,7 @@ tests=(databasedaotest account_test preferenceBackendTest transactionsExcludeUTX
 for elem in "${tests[@]}"
 do
     echo "     * Creating database : $prefix$elem"
-    $command -h $host -p $port $prefix$elem -w -U $user
+    $command -h $host -p $port $prefix$elem -U $user
     echo "     |--> $prefix$elem Done"
 
 done
