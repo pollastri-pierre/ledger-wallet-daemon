@@ -250,8 +250,15 @@ workflows:
           requires:
             - docker/build_image
           docker_compose_configuration: test_image_env.yml
+          docker_compose_env_vars: |-
+            CORE_PG_HOST=postgres
+            CORE_PG_USER=postgres
+            CORE_PG_PWD=ledger_secret
           dgoss_docker_env_vars: |-
             RABBITMQ_URI=amqp://guest:guest@rabbitmq:5672
+            CORE_PG_HOST=postgres
+            CORE_PG_USER=postgres
+            CORE_PG_PWD=ledger_secret
           filters: *filter_all_tags
       - docker/publish_image:
           requires:
