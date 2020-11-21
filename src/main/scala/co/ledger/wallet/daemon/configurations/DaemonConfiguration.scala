@@ -55,8 +55,8 @@ object DaemonConfiguration extends Logging {
     config.getStringList("native_segwit_currencies").asScala.toList
   } else List[String]()
 
-  val adminUsers: Seq[(String, String)] = if (config.hasPath("demo_users")) {
-    val usersConfig = config.getConfigList("demo_users").asScala
+  val adminUsers: Seq[(String, String)] = if (config.hasPath("default_users")) {
+    val usersConfig = config.getConfigList("default_users").asScala
     for {
       userConfig <- usersConfig
     } yield (userConfig.getString("username"), userConfig.getString("password"))
