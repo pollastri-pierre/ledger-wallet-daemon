@@ -29,13 +29,6 @@ class LedgerCoreExecutionContext(ec: ExecutionContext) extends co.ledger.core.Ex
   * WARNING this is for debug purpose
   */
 class LogOnlyPolicy(label: String) extends RejectedExecutionHandler with Logging {
-  /**
-    * Always throws RejectedExecutionException.
-    *
-    * @param r the runnable task requested to be executed
-    * @param e the executor attempting to execute this task
-    * @throws RejectedExecutionException always
-    */
   override def rejectedExecution(r: Runnable, e: ThreadPoolExecutor): Unit = {
     logger.info(s"Task aborted !! ${e.getQueue.size()} scheduled tasks on $label")
   }
