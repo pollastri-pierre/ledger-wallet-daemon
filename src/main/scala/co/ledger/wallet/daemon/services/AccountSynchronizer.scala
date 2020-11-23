@@ -251,8 +251,7 @@ class AccountSynchronizer(account: Account,
     case h: BlockHeight => context become idle(lastHeightSeen = h)
       self ! StartSynchronization
     case StartSynchronization =>
-    case GetStatus | ReSync => sender() ! Synced(0)
-    case ForceSynchronization => sender() ! SynchronizationResult(account.getIndex, walletName, poolName, syncResult = false)
+    case GetStatus | ReSync | ForceSynchronization => sender() ! Synced(0)
 
     case Failure(t) => log.error(t, s"An error occurred initializing synchro account $accountInfo")
   }
