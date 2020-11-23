@@ -18,7 +18,10 @@ object AccountSyncModule extends AbstractModule {
 
   @Provides @Singleton
   def providesAccountSynchronizer(actorSystem: ActorSystem, publisherFactory : PublisherModule.OperationsPublisherFactory ) : AccountSynchronizerFactory = {
-    (a, w, p ) => actorSystem.actorOf(Props(new AccountSynchronizer(a, w, p, publisherFactory)))
+    (a, w, p ) => actorSystem.actorOf(
+      Props(new AccountSynchronizer(a, w, p, publisherFactory))
+      .withDispatcher(SynchronizationDispatcher.configurationKey(SynchronizationDispatcher.Synchronizer))
+    )
   }
 
   override def configure(): Unit = ()

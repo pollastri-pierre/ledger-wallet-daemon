@@ -1,9 +1,5 @@
 package co.ledger.wallet.daemon.services
 
-import java.lang
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{Executors, ThreadFactory}
-
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
 import cats.data.OptionT
@@ -24,7 +20,8 @@ class AccountOperationsPublisher(account: Account, wallet: Wallet, poolName: Poo
 
   private var numberOfReceivedOperations: Int = 0
 
-  implicit val ec: ExecutionContextExecutor = context.system.dispatchers.lookup("akka.wd-blocking-dispatcher")
+  implicit val dispatcher : ExecutionContextExecutor = context.dispatcher
+  val lookupDispatcher : ExecutionContextExecutor = context.system.dispatchers.lookup(SynchronizationDispatcher.configurationKey(SynchronizationDispatcher.LibcoreLookup))
   private val eventReceiver = new AccountOperationReceiver(self)
   private val accountInfo: String = s"$poolName/${wallet.getName}/${account.getIndex}"
 
@@ -53,11 +50,11 @@ class AccountOperationsPublisher(account: Account, wallet: Wallet, poolName: Poo
 
     case NewERC20OperationEvent(accUid, opId) =>
       updateOperationsCount()
-      fetchErc20OperationView(accUid, opId)(AccountOperationContext.fetchEc).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
+      fetchErc20OperationView(accUid, opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
 
     case NewOperationEvent(opId) =>
       updateOperationsCount()
-      fetchOperationView(opId)(AccountOperationContext.fetchEc).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishERC20Operation(op, account, wallet, poolName.name)
+      fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishERC20Operation(op, account, wallet, poolName.name)
       )
     case DeletedOperationEvent(opId) => publisher.publishDeletedOperation(opId.uid, account, wallet, poolName.name)
     case PublishOperation(op) => publisher.publishOperation(op, account, wallet, poolName.name)
@@ -67,14 +64,14 @@ class AccountOperationsPublisher(account: Account, wallet: Wallet, poolName: Poo
 
   private def stopListeningEvents(account: Account): Unit = eventReceiver.stopListeningEvents(account.getEventBus)
 
-  private def fetchOperationView(id: OperationId)(implicit ec: ExecutionContext): OptionT[Future, OperationView] = OptionT(account.operationView(id.uid, 1, wallet))
+  private def fetchOperationView(id: OperationId): OptionT[Future, OperationView] = OptionT(account.operationView(id.uid, 1, wallet)(lookupDispatcher))
 
-  private def fetchErc20OperationView(accUid: Erc20AccountUid, id: OperationId)(implicit ec: ExecutionContext): OptionT[Future, OperationView] = {
+  private def fetchErc20OperationView(accUid: Erc20AccountUid, id: OperationId): OptionT[Future, OperationView] = {
     val op = account.asEthereumLikeAccount().getERC20Accounts.asScala.find(_.getUid == accUid.uid) match {
       case Some(acc) =>
         for {
-          erc20Op <- acc.getOperation(id.uid)
-          ethOp <- account.operationView(erc20Op.getETHOperationUid, 1, wallet)
+          erc20Op <- acc.getOperation(id.uid) // which execution context ?
+          ethOp <- account.operationView(erc20Op.getETHOperationUid, 1, wallet)(lookupDispatcher)
         } yield ethOp.map(o => Operations.getErc20View(erc20Op, o))
       case None => Future.failed(ERC20NotFoundException(s"For erc20 account uid : ${accUid.uid} OperationUid : ${id.uid}"))
     }
@@ -142,11 +139,3 @@ class AccountOperationReceiver(eventTarget: ActorRef) extends EventReceiver {
   def stopListeningEvents(bus: EventBus): Unit = bus.unsubscribe(this)
 }
 
-object AccountOperationContext {
-  implicit val fetchEc: ExecutionContextExecutor = ExecutionContext
-    .fromExecutorService(Executors.newFixedThreadPool(8, new ThreadFactory {
-      val thNumber: AtomicInteger = new AtomicInteger(0)
-
-      override def newThread(r: lang.Runnable): Thread = new Thread(r, "AccountPublisher-" + thNumber.incrementAndGet())
-    }))
-}

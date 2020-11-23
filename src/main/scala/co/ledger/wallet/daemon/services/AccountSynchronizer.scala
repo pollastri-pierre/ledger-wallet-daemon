@@ -1,9 +1,7 @@
 package co.ledger.wallet.daemon.services
 
-import java.lang
 import java.util.Date
-import java.util.concurrent.atomic.AtomicInteger
-import java.util.concurrent.{ConcurrentHashMap, Executors, ThreadFactory}
+import java.util.concurrent.{ConcurrentHashMap, Executors}
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Timers}
@@ -227,8 +225,7 @@ class AccountSynchronizer(account: Account,
                           createPublisher: PublisherModule.OperationsPublisherFactory) extends Actor with Timers
   with ActorLogging {
 
-  // implicit val ec: ExecutionContext = context.dispatcher
-
+  implicit val ec: ExecutionContext = context.dispatcher
   private val walletName = wallet.getName
   private val accountInfo: String = s"$poolName/$walletName/${account.getIndex}"
 
@@ -356,7 +353,6 @@ class AccountSynchronizer(account: Account,
 
 
   private def sync(): Future[SyncResult] = {
-    import AccountSynchronizer.ecSync
     log.info(s"#Sync : start syncing $accountInfo")
     account
       .sync(poolName, walletName)
@@ -376,11 +372,6 @@ class AccountSynchronizer(account: Account,
 }
 
 object AccountSynchronizer {
-  implicit val ecSync: ExecutionContext = ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(8, new ThreadFactory {
-    val thNumber = new AtomicInteger(0)
-
-    override def newThread(r: lang.Runnable): Thread = new Thread(r, "account-synchronizer-" + thNumber.incrementAndGet())
-  }))
 
   /**
     * Wipe all the data's account from the database then restart a Sync
@@ -414,3 +405,22 @@ object AccountSynchronizer {
   private case class SynchronizedOperationsCount(value: Int) extends AnyVal
 
 }
+
+
+sealed trait SynchronizationDispatcher
+object SynchronizationDispatcher {
+  object LibcoreLookup extends SynchronizationDispatcher
+  object Synchronizer extends SynchronizationDispatcher
+  object Publisher extends SynchronizationDispatcher
+
+  type DispatcherKey = String
+
+  def configurationKey(dispatcher : SynchronizationDispatcher) : DispatcherKey = dispatcher match {
+    case LibcoreLookup => "synchronization.libcore-lookup.dispatcher"
+    case Synchronizer => "synchronization.synchronizer.dispatcher"
+    case Publisher => "synchronization.publisher.dispatcher"
+  }
+
+}
+
+
