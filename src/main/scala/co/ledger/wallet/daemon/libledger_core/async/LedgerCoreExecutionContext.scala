@@ -4,8 +4,8 @@ import java.util.concurrent._
 import java.util.{Timer, TimerTask}
 
 import co.ledger.core
-import com.twitter.inject.Logging
 import com.twitter.concurrent.NamedPoolThreadFactory
+import com.twitter.inject.Logging
 
 import scala.concurrent.ExecutionContext
 
