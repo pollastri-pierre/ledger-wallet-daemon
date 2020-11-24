@@ -21,6 +21,7 @@ import co.ledger.wallet.daemon.modules.PublisherModule
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.AccountOperationsPublisher.PoolName
 import co.ledger.wallet.daemon.services.AccountSynchronizer._
+import co.ledger.wallet.daemon.utils.AkkaUtils
 import com.twitter.util.Timer
 import javax.inject.{Inject, Singleton}
 
@@ -117,7 +118,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
       accountInfo,
       (i: AccountInfo) => {
         info(s"Registered account $i to account synchronizer manager")
-        synchronizerFactory(account, wallet, i.poolName)
+        synchronizerFactory(account, wallet, PoolName(i.poolName))
       }
     )
   }
@@ -221,13 +222,13 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   */
 class AccountSynchronizer(account: Account,
                           wallet: Wallet,
-                          poolName: String,
+                          poolName: PoolName,
                           createPublisher: PublisherModule.OperationsPublisherFactory) extends Actor with Timers
   with ActorLogging {
 
   implicit val ec: ExecutionContext = context.dispatcher
   private val walletName = wallet.getName
-  private val accountInfo: String = s"$poolName/$walletName/${account.getIndex}"
+  private val accountInfo: String = s"${poolName.name}/$walletName/${account.getIndex}"
 
   private var operationPublisher: ActorRef = ActorRef.noSender
 
@@ -336,7 +337,7 @@ class AccountSynchronizer(account: Account,
     if (operationPublisher != ActorRef.noSender) {
       operationPublisher ! PoisonPill
     }
-    operationPublisher = createPublisher(this.context, account, wallet, PoolName(poolName))
+    operationPublisher = createPublisher(this.context, account, wallet, poolName)
   }
 
   /**
@@ -355,7 +356,7 @@ class AccountSynchronizer(account: Account,
   private def sync(): Future[SyncResult] = {
     log.info(s"#Sync : start syncing $accountInfo")
     account
-      .sync(poolName, walletName)
+      .sync(poolName.name, walletName)
       .flatMap { result =>
         if (result.syncResult) {
           log.info(s"#Sync : $accountInfo has been synced : $result")
@@ -403,6 +404,9 @@ object AccountSynchronizer {
   private case class BlockHeight(value: Long) extends AnyVal
 
   private case class SynchronizedOperationsCount(value: Int) extends AnyVal
+
+  def name(account: Account, wallet: Wallet, poolName: PoolName): String = AkkaUtils.validActorName("account-synchronizer", poolName.name, wallet.getName, account.getIndex.toString)
+
 
 }
 

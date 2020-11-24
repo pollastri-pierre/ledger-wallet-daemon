@@ -12,6 +12,7 @@ import co.ledger.wallet.daemon.models.Account.RichCoreAccount
 import co.ledger.wallet.daemon.models.Operations
 import co.ledger.wallet.daemon.models.Operations.OperationView
 import co.ledger.wallet.daemon.services.AccountOperationsPublisher._
+import co.ledger.wallet.daemon.utils.AkkaUtils
 
 import scala.collection.JavaConverters._
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
@@ -110,7 +111,7 @@ object AccountOperationsPublisher {
 
   def props(account: Account, wallet: Wallet, poolName: PoolName, publisher: Publisher): Props = Props(new AccountOperationsPublisher(account, wallet, poolName, publisher))
 
-  def name(account: Account, wallet: Wallet, poolName: PoolName): String = s"${poolName.name}.${wallet.getName}.${account.getIndex}"
+  def name(account: Account, wallet: Wallet, poolName: PoolName): String = AkkaUtils.validActorName("operation-publisher", poolName.name, wallet.getName, account.getIndex.toString)
 
 }
 
