@@ -25,6 +25,9 @@ package object core {
       },
       (b, c) => Try(parseDate(Buffers.readString(b, c)))
     )
+
+    implicit val bigint: ValueDecoder[BigInt] = bigint.map(_.bigInteger)
+
   }
 
   object Ordering {

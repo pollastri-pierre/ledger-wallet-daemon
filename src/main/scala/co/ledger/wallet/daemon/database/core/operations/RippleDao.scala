@@ -31,7 +31,7 @@ class RippleDao(db: Database) extends CoinDao with Logging {
       "FROM ripple_memos " +
       "JOIN ripple_operations rop ON rop.transaction_uid = rtx.transaction_uid " +
       s"WHERE tx.uid IN ('${opUids.mkString("','")}') " +
-      s"ORDER BY rop.uid ASC, array_index ASC"
+      "ORDER BY rop.uid ASC, array_index ASC"
 
 
   def findRippleMemos(opUids: Seq[OperationUid]): Future[Seq[(OperationUid, RippleMemoView)]] = {
@@ -108,10 +108,11 @@ class RippleDao(db: Database) extends CoinDao with Logging {
     } yield {
       val opMemos = memos.groupBy(_._1).map { case (opUid, memo) => (opUid, memo.map(_._2).toList) }
       operations.map(pop => {
-        val confirmations = 0 // pop.blockHeight.fold(0L)(opHeight => (lastBlock.getHeight - opHeight) + 1)
-        val txView = Some(RippleTransactionView(
-          pop.txHash, pop.fees.toString(), pop.receiver, pop.sender, pop.value, pop.date,
-          pop.status, pop.sequence.toString(), "", "", opMemos.get(pop.uid).get, pop.destination_tag.longValue()))
+        val confirmations = 0
+        val txView = Some(RippleTransactionView(pop.txHash, pop.fees.toString(), pop.receiver,
+          pop.sender, pop.value, pop.date, pop.status, pop.sequence.toString(), "", "",
+          opMemos.get(pop.uid).get, pop.destination_tag.longValue()))
+
         OperationView(pop.uid, currencyName, currencyFamily, None, confirmations,
           pop.date,
           pop.blockHeight,
@@ -123,7 +124,9 @@ class RippleDao(db: Database) extends CoinDao with Logging {
           pop.senders,
           pop.recipients,
           pop.recipients.filter(a.getAccountKeychain.contains(_)), txView)
+
       })
+
     }
   }
 
