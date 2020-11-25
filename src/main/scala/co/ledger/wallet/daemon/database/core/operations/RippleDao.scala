@@ -21,7 +21,7 @@ class RippleDao(db: Database) extends CoinDao with Logging {
         "rtx.sender, rtx.receiver, rtx.value, rtx.status, rtx.sequence, rtx.destination_tag " +
         "FROM accounts a, wallets w, operations o, ripple_operations xop, blocks b, ripple_transactions rtx " +
         s"WHERE w.name='$walletName' AND a.idx='$accountIndex' " +
-        "AND a.wallet_uid=w.uid AND o.account_uid=a.uid AND o.uid = xop.uid AND o.block_uid=b.uid AND xop.transaction_uid = rtx.transaction_uid" +
+        "AND a.wallet_uid=w.uid AND o.account_uid=a.uid AND o.uid = xop.uid AND o.block_uid=b.uid AND xop.transaction_uid = rtx.transaction_uid " +
         filteredUids.fold("")(uids => s"AND o.uid IN ('${uids.mkString("','")}') ") +
         "ORDER BY o.date " + order.value +
         s" OFFSET $offset LIMIT $limit"
