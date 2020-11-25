@@ -21,6 +21,7 @@ import com.google.common.cache.{CacheLoader, LoadingCache}
 import com.twitter.inject.Logging
 import com.typesafe.config.ConfigFactory
 import org.bitcoinj.core.Sha256Hash
+import slick.jdbc.DriverDataSource
 import slick.jdbc.JdbcBackend.Database
 
 import scala.collection.JavaConverters._
@@ -301,7 +302,7 @@ object Pool extends Logging {
         dbName match {
           case Success((cppUrl, jdbcUrl)) =>
             info(s"Using PostgreSQL as core preference database $jdbcUrl")
-            preferenceBackend = new PostgresPreferenceBackend(Database.forURL(jdbcUrl))
+            preferenceBackend = new PostgresPreferenceBackend(Database.forDataSource(new DriverDataSource(jdbcUrl), Some(2)))
             preferenceBackend.init()
             builder.setExternalPreferencesBackend(preferenceBackend)
             builder.setInternalPreferencesBackend(preferenceBackend)
