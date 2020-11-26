@@ -109,11 +109,15 @@ class RippleDao(db: Database) extends CoinDao with Logging {
       val opMemos = memos.groupBy(_._1).map { case (opUid, memo) => (opUid, memo.map(_._2).toList) }
       operations.map(pop => {
         val confirmations = 0
-        val txView = Some(RippleTransactionView(pop.txHash, pop.fees.toString(), pop.receiver,
-          pop.sender, pop.value, pop.date, pop.status, pop.sequence.toString(), "", "",
+
+        val ledgerSequence = pop.blockHeight.toString // it seems it ledgersequence is the block hieght
+        val signingPubkey = "" // no use
+        val txView = Some(RippleTransactionView(pop.txHash, pop.fees.toString(), pop.receiver, pop.sender, pop.value,
+          pop.date, pop.status, pop.sequence.toString(), ledgerSequence, signingPubkey,
           opMemos.get(pop.uid).get, pop.destination_tag.longValue()))
 
-        OperationView(pop.uid, currencyName, currencyFamily, None, confirmations,
+        OperationView(
+          pop.uid, currencyName, currencyFamily, None, confirmations,
           pop.date,
           pop.blockHeight,
           OperationType.valueOf(pop.opType),
@@ -123,7 +127,8 @@ class RippleDao(db: Database) extends CoinDao with Logging {
           a.getIndex,
           pop.senders,
           pop.recipients,
-          pop.recipients.filter(a.getAccountKeychain.contains(_)), txView)
+          pop.recipients.filter(a.getAccountKeychain.contains(_)),
+          txView)
 
       })
 
