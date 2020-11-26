@@ -164,5 +164,4 @@ class RippleDao(db: Database) extends CoinDao with Logging {
                              status: Int,
                              sequence: BigInt,
                              destination_tag: BigInt)
-
 }
