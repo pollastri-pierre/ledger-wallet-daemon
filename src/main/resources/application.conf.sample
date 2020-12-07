@@ -190,6 +190,19 @@ explorer = {
         disable_sync_token = ${?ETH_ROPSTEN_DISABLE_SYNC_TOKEN}
       }
       {
+        currency = litecoin
+        host = "https://api.ledgerwallet.com"
+        host = ${?WALLET_LTC_EXPLORER_ENDPOINT}
+        port = 443
+        port = ${?WALLET_LTC_EXPLORER_PORT}
+        explorer_version = "v2"
+        explorer_version = ${?WALLET_LTC_EXPLORER_VERSION}
+        proxyuse = true
+        proxyuse = ${?WALLET_LTC_EXPLORER_PROXYUSE}
+        disable_sync_token = false
+        disable_sync_token = ${?LTC_DISABLE_SYNC_TOKEN}
+      }
+      {
         currency = ripple
         host = "https://s2.ripple.com"
         host = ${?WALLET_XRP_EXPLORER_ENDPOINT}
