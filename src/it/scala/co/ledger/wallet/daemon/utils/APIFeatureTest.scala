@@ -1,7 +1,7 @@
 package co.ledger.wallet.daemon.utils
 
 import co.ledger.wallet.daemon.ServerImpl
-import co.ledger.wallet.daemon.services.OperationQueryParams
+import co.ledger.wallet.daemon.services.{OperationQueryParams, SyncStatus, Synced}
 import com.twitter.finagle.http.{Response, Status}
 import com.twitter.finatra.http.EmbeddedHttpServer
 import com.twitter.inject.server.FeatureTest
@@ -122,7 +122,6 @@ trait APIFeatureTest extends FeatureTest {
 
   protected def assertGetUTXO(poolName: String, walletName: String, index: Int, expected: Status): Response = {
     server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$index/utxo", andExpect = expected)
-    server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$index/utxo?offset=2&batch=10", andExpect = expected)
   }
 
   protected def assertSignTransaction(tx: String, poolName: String, walletName: String, accountIndex: Int, expected: Status): Response = {
@@ -142,8 +141,11 @@ trait APIFeatureTest extends FeatureTest {
 
   protected def awaitSync(poolName: String, walletName: String, accIdx: Int) = {
 
-    def isSynced = server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accIdx/sync-status", "", andExpect = Status.Ok)
-      .contentString.contains("synced")
+    def isSynced = {
+      val syncStatus = parse[SyncStatus](server.httpGet(s"/pools/$poolName/wallets/$walletName/accounts/$accIdx/sync-status", "", andExpect = Status.Ok))
+      logger.info(s"Waiting for account $poolName-$walletName-$accIdx to be synced : $syncStatus")
+      syncStatus.value == "synced" && syncStatus.asInstanceOf[Synced].atHeight > 0L
+    }
 
     var attempt = 240
     while (!isSynced && attempt > 0) {
