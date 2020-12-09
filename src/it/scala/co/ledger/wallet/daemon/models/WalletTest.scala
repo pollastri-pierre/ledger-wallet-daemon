@@ -8,6 +8,7 @@ import co.ledger.wallet.daemon.exceptions.UnsupportedNativeSegwitException
 import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Currency.RichCoreCurrency
 import co.ledger.wallet.daemon.models.Wallet.RichCoreWallet
+import co.ledger.wallet.daemon.services.Synced
 import co.ledger.wallet.daemon.utils.NativeLibLoader
 import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
@@ -27,7 +28,7 @@ class WalletTest extends AssertionsForJUnit {
     "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb")
 
   @Test def verifyWalletActivities(): Unit = {
-    val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("random", 2L, "", Option(0L))), Duration.Inf), 1L)
+    val testPool = Pool.newPoolInstance(PoolDto("random", "", Option(0L))).get
 
     val testWallet = Await.result(testPool.addWalletIfNotExist("test_wallet", "bitcoin", isNativeSegwit = false), Duration.Inf)
 
@@ -41,7 +42,8 @@ class WalletTest extends AssertionsForJUnit {
           }
         )
       }.flatMap { info =>
-        testWallet.addAccountIfNotExist(info) }
+        testWallet.addAccountIfNotExist(info)
+      }
     }, Duration.Inf)
 
     val account6: core.Account = Await.result(
@@ -72,7 +74,7 @@ class WalletTest extends AssertionsForJUnit {
     val account = Await.result(testWallet.account(testAccount.getIndex), Duration.Inf)
     assert(account.map(_.getIndex) === accounts.headOption.map(_.getIndex))
     val walletView = Await.result(testWallet.walletView, Duration.Inf)
-    val accountView = Await.result(testAccount.accountView(testWallet.getName, testWallet.getCurrency.currencyView), Duration.Inf)
+    val accountView = Await.result(testAccount.accountView(testPool, testWallet, testWallet.getCurrency.currencyView, Synced(0)), Duration.Inf)
     assert(walletView.balance === accountView.index)
     assert(0 === testAccount.getIndex)
     assert(6 === account6.getIndex)
@@ -80,7 +82,7 @@ class WalletTest extends AssertionsForJUnit {
   }
 
   @Test def verifyWalletSupportNativeSegwit(): Unit = {
-    val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(new PoolDto("random", 2L, "", Option(0L))), Duration.Inf), 1L)
+    val testPool = Pool.newPoolInstance(PoolDto("random", "", Option(0L))).get
 
     val testWalletBitcoinNativeSegwit = Await.result(testPool.addWalletIfNotExist("test_wallet_bitcoin_native_segwit", "bitcoin", isNativeSegwit = true), Duration.Inf)
 

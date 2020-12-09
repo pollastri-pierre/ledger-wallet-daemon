@@ -113,6 +113,11 @@ case class SyncOnGoingException() extends {
   val code = ErrorCodes.SYNC_ON_GOING
 } with DaemonException(msg)
 
+case class ResyncOnGoingException(targetHeight: Long, currentHeight: Long) extends {
+  val msg = "Account is under resynchronization"
+  val code = ErrorCodes.RESYNC_ON_GOING
+} with DaemonException(msg)
+
 case class SignatureSizeUnmatchException(txSize: Int, signatureSize: Int) extends {
   val code = ErrorCodes.SIGNATURE_SIZE_UNMATCH
   val msg = "Signatures and transaction inputs size not matching"
@@ -145,6 +150,7 @@ object ErrorCodes {
   val ACCOUNT_SYNC_FAILED = 211
   val SYNC_ON_GOING = 212
   val INVALID_CURRENCY_FOR_NATIVE_SEGWIT = 213
+  val RESYNC_ON_GOING = 214
   val CORE_BAD_REQUEST = 301
   val DAEMON_DATABASE_EXCEPTION = 302
   val PROVIDER_BALANCE_EXCEPTION = 303

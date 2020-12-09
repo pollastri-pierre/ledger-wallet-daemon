@@ -45,7 +45,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     filter[DeprecatedRouteFilter].filter[AccountCreationFilter]
       .post("/accounts") { request: AccountsRequest =>
         info(s"CREATE account $request, " +
-          s"Parameters(user: ${request.user.id}, pool_name: ${request.pool_name}, wallet_name: ${request.wallet_name}), " +
+          s"Parameters(pool_name: ${request.pool_name}, wallet_name: ${request.wallet_name}), " +
           s"Body(${request.request.accountCreationBody}")
         accountsService.createAccount(request.request.accountCreationBody, request.walletInfo)
       }
@@ -54,7 +54,7 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     filter[DeprecatedRouteFilter].filter[AccountExtendedCreationFilter]
       .post("/accounts/extended") { request: AccountsRequest =>
         info(s"CREATE account ${request.request}, " +
-          s"Parameters(user: ${request.user.id}, pool_name: ${request.pool_name}, wallet_name: ${request.wallet_name}), " +
+          s"Parameters(pool_name: ${request.pool_name}, wallet_name: ${request.wallet_name}), " +
           s"Body(${request.request.accountExtendedCreationBody}")
         accountsService.createAccountWithExtendedInfo(request.request.accountExtendedCreationBody, request.walletInfo)
       }
@@ -82,9 +82,14 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
     }
 
     // End point queries for account views with specified pool name and wallet name.
-    delete("/accounts/:account_index") { request: AccountRequest =>
-      info(s"DELETE accounts $request")
-      accountsService.eraseAccountData(request.accountInfo)
+    post("/accounts/:account_index/resync") { request: AccountRequest =>
+      info(s"Resync accounts $request")
+      accountsService.resynchronizeAccount(request.accountInfo)
+    }
+
+    get("/accounts/:account_index/sync-status") { request: AccountRequest =>
+      info(s"get account sync status $request")
+      accountsService.syncStatus(request.accountInfo)
     }
 
     // End point queries for account view with specified pool, wallet name, and unique account index.
@@ -167,6 +172,10 @@ class AccountsController @Inject()(accountsService: AccountsService) extends Con
         accountsService.synchronizeAccount(request.accountInfo)
       }
 
+      post("/operations/repush") { request: RepushRequest =>
+        accountsService.repushOperations(request.accountInfo, request.from)
+      }
+
       // List of utxos available on this account
       get("/utxo") { request: UtxoAccountRequest =>
         accountsService.getUtxo(request.accountInfo, request.offset, request.batch)
@@ -211,7 +220,7 @@ object AccountsController {
   private val DEFAULT_OPERATION_MODE: Int = 0
 
 
-  abstract class BaseAccountRequest extends RequestWithUser with WithWalletInfo {
+  abstract class BaseAccountRequest extends WalletDaemonRequest with WithWalletInfo {
     val pool_name: String
     val wallet_name: String
 
@@ -362,7 +371,7 @@ object AccountsController {
                                          @RouteParam wallet_name: String,
                                          @QueryParam account_index: Option[Int],
                                          request: Request
-                                       ) extends RequestWithUser with WithWalletInfo {
+                                       ) extends WalletDaemonRequest with WithWalletInfo {
     @MethodValidation
     def validatePoolName: ValidationResult = CommonMethodValidations.validateName("pool_name", pool_name)
 
@@ -424,4 +433,11 @@ object AccountsController {
                                request: Request
                              ) extends BaseSingleAccountRequest
 
+  case class RepushRequest(
+                             @RouteParam override val pool_name: String,
+                             @RouteParam override val wallet_name: String,
+                             @RouteParam override val account_index: Int,
+                             @QueryParam from: Option[Long],
+                             request: Request
+                           ) extends BaseSingleAccountRequest
 }

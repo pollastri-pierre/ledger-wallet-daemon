@@ -1,7 +1,5 @@
 package co.ledger.wallet.daemon.models
 
-import java.util.UUID
-
 import co.ledger.core
 import co.ledger.core.Address
 import co.ledger.wallet.daemon.async.MDCPropagatingExecutionContext.Implicits.global
@@ -10,14 +8,18 @@ import co.ledger.wallet.daemon.models.Account._
 import co.ledger.wallet.daemon.models.Wallet._
 import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.utils.NativeLibLoader
+import org.junit.Test
 // import org.junit.Test
 import org.scalatest.junit.AssertionsForJUnit
 
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 
+@Test
 class AccountTest extends AssertionsForJUnit {
   NativeLibLoader.loadLibs()
+
+  val poolName = "account_test"
 
   private val PUBKEYS = List[String](
     "04fb60043afe80ee1aeb0160e2aafc94690fb4427343e8d4bf410105b1121f7a44a311668fa80a7a341554a4ef5262bc6ebd8cc981b8b600dafd40f7682edb5b3b",
@@ -26,7 +28,7 @@ class AccountTest extends AssertionsForJUnit {
     "88c2281acd51737c912af74cc1d1a8ba564eb7925e0d58a5500b004ba76099cb",
     "d1bb833ecd3beed6ec5f6aa79d3a424d53f5b99147b21dbc00456b05bc978a71")
 
-  private val testPool = Pool.newInstance(Await.result(Pool.newCoreInstance(PoolDto(UUID.randomUUID().toString, 2L, "", Option(0L))), Duration.Inf), 1L)
+  private val testPool = Pool.newPoolInstance(PoolDto(poolName, "", Option(0L))).get
 
   private val testWallet = Await.result(testPool.addWalletIfNotExist("test_wallet", "bitcoin", isNativeSegwit = false), Duration.Inf)
 
@@ -65,18 +67,22 @@ class AccountTest extends AssertionsForJUnit {
 
   private val freshAddresses: Seq[Address] = Await.result(account2.freshAddresses, Duration.Inf)
 
+  // Dummy test to avoid no runnable method of JUnit
+  @Test
+  def verifyInitialization(): Unit = Unit
+
   // FIXME: Broken test
   // @Test
   def verifyAccountCreation(): Unit = {
     assert(0 === account0.getIndex)
     assert(1 === account1.getIndex)
     assert(2 === account2.getIndex)
-    val emptyOp = Await.result(account0.operation("nonexistoperation", 1), Duration.Inf)
+    val emptyOp = Await.result(account0.operationView("nonexistoperation", 1, testWallet), Duration.Inf)
     assert(emptyOp.isEmpty)
-    val operations = Await.result(account0.operations(0, 1, 1), Duration.Inf)
+    val operations = Await.result(account0.operationViews(0, 1, 1, testWallet), Duration.Inf)
     assert(1 === operations.size)
-    val headOp = Await.result(account0.operation(operations.head.getUid, 1), Duration.Inf)
-    assert(headOp.map(_.getUid) === Option(operations.head.getUid))
+    val headOp = Await.result(account0.operationView(operations.head.uid, 1, testWallet), Duration.Inf)
+    assert(headOp.map(_.uid) === Option(operations.head.uid))
     assert(freshAddresses.nonEmpty)
   }
 }
