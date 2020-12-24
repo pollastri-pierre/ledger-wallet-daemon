@@ -1,5 +1,5 @@
 # Database engine to use for Wallet-Daemon (users and pools)
-database_engine = "postgres"
+database_engine = "sqlite3"
 database_engine = ${?WALLET_DAEMON_DATABASE_ENGINE}
 
 
@@ -9,6 +9,21 @@ sqlite3 = {
   url = ${?WALLET_JDBC_URL}
   driver = "org.sqlite.JDBC"
   connectionPool = disabled
+}
+
+user-preferences {
+    storage=redis
+    storage=${?PREFERENCES_STORAGE}
+}
+
+redis = {
+    host = "localhost"
+    host = ${?REDIS_HOST}
+    port = 6379
+    port = ${?REDIS_PORT}
+    password = ${?REDIS_PASSWORD}
+    db = ${?REDIS_DB_NAME}
+    connection_timeout = ${?REDIS_CONNECTION_TIMEOUT}
 }
 
 core = {
