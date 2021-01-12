@@ -128,7 +128,7 @@ class EthereumDao(protected val db: Database) extends CoinDao with ERC20Dao with
     */
   private def findErc20ParialView(a: Account, w: Wallet, ethOperationUids: Option[Seq[OperationUid]],
                                   offset: Int, limit: Int): Future[Map[OperationUid, EthereumTransactionView.ERC20]] = {
-    logger.info(s"Retrieving erc20 operations for account : $a - limit=$limit offset=$offset filtered by ${ethOperationUids.map(_.size)}")
+    logger.debug(s"Retrieving erc20 operations for account : $a - limit=$limit offset=$offset filtered by ${ethOperationUids.map(_.size)}")
 
     def retrieveERC20Operations = {
       queryERC20OperationsFromEthUids[(OperationUid, EthereumTransactionView.ERC20)](a.getIndex, w.getName, ethOperationUids, offset, limit) {
@@ -148,7 +148,7 @@ class EthereumDao(protected val db: Database) extends CoinDao with ERC20Dao with
 
   private def findErc20FullOperationView(a: Account, w: Wallet, erc20OperationUids: Option[Seq[ERC20OperationUid]],
                                          offset: Int, limit: Int): Future[Seq[OperationView]] = {
-    logger.info(s"Retrieving erc20 operations for account : $a - limit=$limit offset=$offset filtered by ${erc20OperationUids.map(_.size)}")
+    logger.debug(s"Retrieving erc20 operations for account : $a - limit=$limit offset=$offset filtered by ${erc20OperationUids.map(_.size)}")
 
     val currency = w.getCurrency
     val currencyName = currency.getName
