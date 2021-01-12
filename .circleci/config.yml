@@ -260,10 +260,9 @@ workflows:
             CORE_PG_HOST=postgres
             CORE_PG_USER=postgres
             CORE_PG_PWD=ledger_secret
-          filters: *filter_all_tags
-          dgoss_docker_env_vars: |-
             WALLET_DAEMON_DATABASE_ENGINE=sqlite3
             CORE_DATABASE_ENGINE=sqlite3
+          filters: *filter_all_tags
 
       - docker/publish_image:
           context: githubpkg
