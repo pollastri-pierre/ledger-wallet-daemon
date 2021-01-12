@@ -1,6 +1,6 @@
 package co.ledger.wallet.daemon.context
 
-import java.util.concurrent.Executors
+import java.util.concurrent.{Executors, ForkJoinPool, ForkJoinWorkerThread}
 
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import com.twitter.concurrent.NamedPoolThreadFactory
@@ -22,11 +22,20 @@ object ApplicationContext {
     ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(2 * Runtime.getRuntime.availableProcessors(),
       new NamedPoolThreadFactory("libcore-dispatcher")))
 
+  private val forkJoinWorkerThreadFactory: (String) => ForkJoinPool.ForkJoinWorkerThreadFactory = (prefix: String) => new ForkJoinPool.ForkJoinWorkerThreadFactory() {
+    override def newThread(pool: ForkJoinPool): ForkJoinWorkerThread = {
+      val worker = ForkJoinPool.defaultForkJoinWorkerThreadFactory.newThread(pool)
+      worker.setName(prefix + worker.getPoolIndex)
+      worker
+    }
+  }
+
   /**
     * Libcore http call ExcutionContext
     */
   val httpEc: ExecutionContext = ExecutionContext.fromExecutorService(
-    Executors.newCachedThreadPool(new NamedPoolThreadFactory("libcore-http")))
+    new ForkJoinPool(Runtime.getRuntime.availableProcessors(), forkJoinWorkerThreadFactory("libcore-http"), null, false)
+  )
 
   /**
     * Libcore http call ExcutionContext
