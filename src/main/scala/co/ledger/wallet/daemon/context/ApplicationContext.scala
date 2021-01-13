@@ -13,7 +13,8 @@ object ApplicationContext {
     * Execution Context dedicated for waiting synchronization
     */
   implicit val IOPool: ExecutionContextExecutorService =
-    ExecutionContext.fromExecutorService(Executors.newCachedThreadPool(new NamedPoolThreadFactory("walletdaemon-IO")))
+    ExecutionContext.fromExecutorService(Executors.newFixedThreadPool(4,
+      new NamedPoolThreadFactory("walletdaemon-IO")))
 
   /**
     * Libcore thread dispatcher context
