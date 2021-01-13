@@ -53,10 +53,10 @@ class AccountOperationsPublisher(daemonCache: DaemonCache, account: Account, wal
       publisher.publishAccount(pool, account, wallet, s)
     case NewERC20OperationEvent(_, opId) =>
       updateOperationsCount()
-      fetchErc20OperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishERC20Operation(op, account, wallet, poolName.name))
+      // fetchErc20OperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishERC20Operation(op, account, wallet, poolName.name))
     case NewOperationEvent(opId) =>
       updateOperationsCount()
-      fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
+      // fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
     case DeletedOperationEvent(opId) => publisher.publishDeletedOperation(opId.uid, account, wallet, poolName.name)
     case PublishOperation(op) =>
       publisher.publishOperation(op, account, wallet, poolName.name)
