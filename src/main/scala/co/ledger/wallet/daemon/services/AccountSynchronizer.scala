@@ -2,6 +2,7 @@ package co.ledger.wallet.daemon.services
 
 import java.util.Date
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicInteger
 
 import akka.actor.Status.Failure
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, Timers}
@@ -24,6 +25,7 @@ import co.ledger.wallet.daemon.services.AccountSynchronizer._
 import co.ledger.wallet.daemon.utils.AkkaUtils
 import com.twitter.util.Timer
 import javax.inject.{Inject, Singleton}
+import co.ledger.wallet.daemon.utils.Utils.RichTwitterFuture
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -31,6 +33,22 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.language.postfixOps
 import scala.util.Success
 import scala.util.control.NonFatal
+
+/*
+
+/** Convert from a Twitter Future to a Scala Future */
+class RichTwitterFuture[A](val tf: com.twitter.util.Future[A]) extends AnyVal {
+  def asScala: scala.concurrent.Future[A] = {
+    val promise: scala.concurrent.Promise[A] = scala.concurrent.Promise()
+    tf.respond {
+      case Return(value) => promise.success(value)
+      case Throw(exception) => promise.failure(exception)
+    }
+    promise.future
+  }
+}
+*/
+
 
 /**
   * This module is responsible to maintain account updated
@@ -53,6 +71,8 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   // the cache to track the AS
   private val registeredAccounts = new ConcurrentHashMap[AccountInfo, ActorRef]()
 
+  private val onGoingSyncs = new AtomicInteger(0)
+
   // should be called after the instantiation of this class
   def start(): Future[Unit] = {
     registerAccounts.andThen {
@@ -61,7 +81,6 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
         info("Started account synchronizer manager")
     }
   }
-
 
   // An external control to resync an account
   def resyncAccount(accountInfo: AccountInfo): Unit = {
@@ -78,9 +97,15 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
     })(forceSync(_).map(synchronizationResult(accountInfo)))
   }
 
-  private def forceSync(synchronizer: ActorRef) = {
-    implicit val timeout: Timeout = Timeout(60 seconds)
-    ask(synchronizer, ForceSynchronization).mapTo[SyncStatus]
+  private def forceSync(synchronizer: ActorRef): Future[SyncStatus] = {
+    if (onGoingSyncs.getAndIncrement() >= DaemonConfiguration.Synchronization.maxOnGoing) {
+      onGoingSyncs.decrementAndGet()
+      scheduler.doLater(Duration.fromSeconds(DaemonConfiguration.Synchronization.delaySync))(forceSync(synchronizer)).asScala().flatten
+    } else {
+      implicit val timeout: Timeout = Timeout(60 seconds)
+      ask(synchronizer, ForceSynchronization).mapTo[SyncStatus]
+        .andThen { case _ => onGoingSyncs.decrementAndGet() }
+    }
   }
 
   def syncPool(poolInfo: PoolInfo): Future[Seq[SynchronizationResult]] =

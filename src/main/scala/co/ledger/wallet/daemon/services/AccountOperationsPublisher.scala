@@ -3,8 +3,6 @@ package co.ledger.wallet.daemon.services
 
 import akka.actor.{Actor, ActorLogging, ActorRef, Props}
 import akka.event.LoggingReceive
-import cats.data.OptionT
-import cats.implicits._
 import co.ledger.core._
 import co.ledger.wallet.daemon.database.DaemonCache
 import co.ledger.wallet.daemon.libledger_core.async.LedgerCoreExecutionContext
@@ -12,10 +10,9 @@ import co.ledger.wallet.daemon.models.Operations.OperationView
 import co.ledger.wallet.daemon.models.{Pool, PoolInfo}
 import co.ledger.wallet.daemon.services.AccountOperationsPublisher._
 import co.ledger.wallet.daemon.utils.AkkaUtils
-import co.ledger.wallet.daemon.utils.Utils._
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future => ScalaFuture}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor}
 
 class AccountOperationsPublisher(daemonCache: DaemonCache, account: Account, wallet: Wallet, poolName: PoolName, publisher: Publisher) extends Actor with ActorLogging {
 
@@ -24,7 +21,7 @@ class AccountOperationsPublisher(daemonCache: DaemonCache, account: Account, wal
   implicit val dispatcher: ExecutionContextExecutor = context.dispatcher
   val lookupDispatcher: ExecutionContextExecutor = context.system.dispatchers.lookup(SynchronizationDispatcher.configurationKey(SynchronizationDispatcher.LibcoreLookup))
   private lazy val pool: Pool = Await.result(daemonCache.getWalletPool(PoolInfo(poolName.name))(lookupDispatcher), 30.seconds).get
-  private lazy val walletPoolDao = pool.walletPoolDao
+  // private lazy val walletPoolDao = pool.walletPoolDao
 
   private val eventReceiver = new AccountOperationReceiver(self)
   private val accountInfo: String = s"$poolName/${wallet.getName}/${account.getIndex}"
@@ -51,10 +48,10 @@ class AccountOperationsPublisher(daemonCache: DaemonCache, account: Account, wal
       })
     case s: SyncStatus =>
       publisher.publishAccount(pool, account, wallet, s)
-    case NewERC20OperationEvent(_, opId) =>
+    case NewERC20OperationEvent(_, _) =>
       updateOperationsCount()
       // fetchErc20OperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishERC20Operation(op, account, wallet, poolName.name))
-    case NewOperationEvent(opId) =>
+    case NewOperationEvent(_) =>
       updateOperationsCount()
       // fetchOperationView(opId).fold(log.warning(s"operation not found: $opId"))(op => publisher.publishOperation(op, account, wallet, poolName.name))
     case DeletedOperationEvent(opId) => publisher.publishDeletedOperation(opId.uid, account, wallet, poolName.name)
@@ -65,13 +62,14 @@ class AccountOperationsPublisher(daemonCache: DaemonCache, account: Account, wal
   private def listenOperationsEvents(account: Account): Unit = eventReceiver.listenEvents(account.getEventBus)
 
   private def stopListeningEvents(account: Account): Unit = eventReceiver.stopListeningEvents(account.getEventBus)
+/*
 
   private def fetchOperationView(id: OperationId): OptionT[ScalaFuture, OperationView] =
     OptionT(walletPoolDao.findOperationByUid(account, wallet, id.uid, 0, Int.MaxValue).asScala())
 
   private def fetchErc20OperationView(erc20op: OperationId): OptionT[ScalaFuture, OperationView] =
     OptionT(walletPoolDao.findERC20OperationByUid(account, wallet, erc20op.uid).asScala())
-
+*/
 
   private def updateOperationsCount(): Unit = {
     numberOfReceivedOperations += 1
