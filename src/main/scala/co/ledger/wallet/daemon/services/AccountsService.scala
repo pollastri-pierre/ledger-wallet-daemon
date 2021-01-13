@@ -83,6 +83,10 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     synchronizerManager.getSyncStatus(accountInfo)
   }
 
+  def ongoingSyncs(): Future[Int] = {
+    synchronizerManager.ongoingSyncs()
+  }
+
   /**
     * Method to synchronize account operations from public resources. The method may take a while
     * to finish. This method only synchronize a single account.

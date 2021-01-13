@@ -164,6 +164,17 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
     status.value
   }
 
+  def ongoingSyncs(): Future[Int] = {
+    for {
+      synchronizers <- Future.successful(registeredAccounts.values().asScala)
+      statuses <- Future.sequence(synchronizers.map(synchronizer => ask(synchronizer, GetStatus)(Timeout(10 seconds)).mapTo[SyncStatus]))
+      filtered = statuses.filter {
+        case Syncing(_, _) => true
+        case _ => false
+      }
+    } yield filtered.size
+  }
+
   // Maybe to be called periodically to discover new account
   private def registerAccounts: Future[Unit] = {
     for {
@@ -354,7 +365,6 @@ class AccountSynchronizer(cache: DaemonCache,
     log.info(s"#Sync : account $accountInfo libcore wipe ended (errorCode : $errorCode ")
     SynchronizedOperationsCount(lastKnownOperationsCount)
   }
-
 
   private def sync(): Future[SyncResult] = {
     import co.ledger.wallet.daemon.context.ApplicationContext.IOPool
