@@ -34,22 +34,6 @@ import scala.language.postfixOps
 import scala.util.Success
 import scala.util.control.NonFatal
 
-/*
-
-/** Convert from a Twitter Future to a Scala Future */
-class RichTwitterFuture[A](val tf: com.twitter.util.Future[A]) extends AnyVal {
-  def asScala: scala.concurrent.Future[A] = {
-    val promise: scala.concurrent.Promise[A] = scala.concurrent.Promise()
-    tf.respond {
-      case Return(value) => promise.success(value)
-      case Throw(exception) => promise.failure(exception)
-    }
-    promise.future
-  }
-}
-*/
-
-
 /**
   * This module is responsible to maintain account updated
   * It's pluggable to external trigger
@@ -98,7 +82,7 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   }
 
   private def forceSync(synchronizer: ActorRef): Future[SyncStatus] = {
-    if (onGoingSyncs.getAndIncrement() >= DaemonConfiguration.Synchronization.maxOnGoing) {
+    if (onGoingSyncs.incrementAndGet() > DaemonConfiguration.Synchronization.maxOnGoing) {
       onGoingSyncs.decrementAndGet()
       scheduler.doLater(Duration.fromSeconds(DaemonConfiguration.Synchronization.delaySync))(forceSync(synchronizer)).asScala().flatten
     } else {
