@@ -8,7 +8,8 @@ import co.ledger.wallet.daemon.clients.{ApiClient, ClientFactory}
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.libledger_core.metrics.LibCoreMetrics
 import co.ledger.wallet.daemon.libledger_core.metrics.LibCoreMetrics.{AllocationMetric, DurationMetric}
-import co.ledger.wallet.daemon.services.AccountsService
+import co.ledger.wallet.daemon.models.AccountInfo
+import co.ledger.wallet.daemon.services.{AccountsService, SyncStatus}
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import javax.inject.Inject
@@ -64,7 +65,7 @@ object StatusController {
 
   case class VersionResponse(name: String, version: String, scalaVersion: String, commitHash: String, libcoreVersion: String, explorers: DaemonConfiguration.ExplorerConfig)
 
-  case class MetricsResponse(coreHttpCachedPool: Long, feesHttpCachedPool: Long, fallbackHttpCachedPool: Long, ongoingSyncs: Long)
+  case class MetricsResponse(coreHttpCachedPool: Long, feesHttpCachedPool: Long, fallbackHttpCachedPool: Long, ongoingSyncs: List[(AccountInfo, SyncStatus)])
 
   case class LibCoreMetricsResponse(allocations: List[AllocationMetric], durations: List[DurationMetric])
 }

@@ -23,9 +23,9 @@ import co.ledger.wallet.daemon.schedulers.observers.SynchronizationResult
 import co.ledger.wallet.daemon.services.AccountOperationsPublisher.PoolName
 import co.ledger.wallet.daemon.services.AccountSynchronizer._
 import co.ledger.wallet.daemon.utils.AkkaUtils
+import co.ledger.wallet.daemon.utils.Utils.RichTwitterFuture
 import com.twitter.util.Timer
 import javax.inject.{Inject, Singleton}
-import co.ledger.wallet.daemon.utils.Utils.RichTwitterFuture
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
@@ -82,6 +82,9 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
   }
 
   private def forceSync(synchronizer: ActorRef): Future[SyncStatus] = {
+    val syncs = ongoingSyncs()
+    syncs.wait(10)
+    error(s"TEST ${syncs.value.get.get}")
     if (onGoingSyncs.incrementAndGet() > DaemonConfiguration.Synchronization.maxOnGoing) {
       onGoingSyncs.decrementAndGet()
       scheduler.doLater(Duration.fromSeconds(DaemonConfiguration.Synchronization.delaySync))(forceSync(synchronizer)).asScala().flatten
@@ -173,15 +176,13 @@ class AccountSynchronizerManager @Inject()(daemonCache: DaemonCache, synchronize
     status.value
   }
 
-  def ongoingSyncs(): Future[Int] = {
-    for {
-      synchronizers <- Future.successful(registeredAccounts.values().asScala)
-      statuses <- Future.sequence(synchronizers.map(synchronizer => ask(synchronizer, GetStatus)(Timeout(10 seconds)).mapTo[SyncStatus]))
-      filtered = statuses.filter {
-        case Syncing(_, _) => true
-        case _ => false
-      }
-    } yield filtered.size
+  def ongoingSyncs(): Future[List[(AccountInfo, SyncStatus)]] = {
+    Future.sequence(
+      registeredAccounts.asScala.map {
+        case (accountInfo, synchronizer) =>
+          ask(synchronizer, GetStatus)(Timeout(10 seconds)).mapTo[SyncStatus].map(status => (accountInfo, status))
+      }.toList
+    )
   }
 
   // Maybe to be called periodically to discover new account

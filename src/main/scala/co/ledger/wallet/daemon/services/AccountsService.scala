@@ -83,7 +83,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
     synchronizerManager.getSyncStatus(accountInfo)
   }
 
-  def ongoingSyncs(): Future[Int] = {
+  def ongoingSyncs(): Future[List[(AccountInfo, SyncStatus)]] = {
     synchronizerManager.ongoingSyncs()
   }
 
