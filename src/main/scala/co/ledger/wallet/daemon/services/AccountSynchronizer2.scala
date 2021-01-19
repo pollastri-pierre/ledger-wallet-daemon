@@ -2,7 +2,6 @@ package co.ledger.wallet.daemon.services
 
 import akka.actor.{Actor, ActorLogging, ActorRef, ActorSystem, PoisonPill, Props, UnboundedStash}
 import akka.pattern.{ask, pipe}
-import akka.routing.SmallestMailboxPool
 import akka.util.Timeout
 import cats.implicits._
 import co.ledger.core._
@@ -128,12 +127,11 @@ class AccountSynchronizerWatchdog(scheduler: Timer) extends Actor with ActorLogg
 
   val accounts: mutable.HashMap[AccountInfo, AccountData] = new mutable.HashMap[AccountInfo, AccountData]()
 
-  var router: ActorRef = ActorRef.noSender
+  var synchronizer: ActorRef = ActorRef.noSender
 
   override def preStart(): Unit = {
     super.preStart()
-    router = context.actorOf(SmallestMailboxPool(DaemonConfiguration.Synchronization.maxOnGoing)
-      .props(Props[AccountSynchronizer2]()), "router")
+    synchronizer = context.actorOf(Props(new AccountSynchronizer2()), "synchronizer")
   }
 
   override val receive: Receive = {
@@ -155,7 +153,9 @@ class AccountSynchronizerWatchdog(scheduler: Timer) extends Actor with ActorLogg
     val syncing = accounts(accountInfo).syncStatus match {
       case Synced(atHeight) => Syncing(atHeight, atHeight)
       case FailedToSync(_) => Syncing(0, 0)
-      case other => other // should not happen
+      case other =>
+        log.warning(s"Unexpected previous account synchronization state ${other} before starting new synchronization. Keep status as is, although synchronization is running.")
+        other
     }
     log.debug(s"Updated new status of account ${accountInfo}: ${syncing}")
     accounts += ((accountInfo, accounts(accountInfo).copy(syncStatus = syncing)))
@@ -169,7 +169,7 @@ class AccountSynchronizerWatchdog(scheduler: Timer) extends Actor with ActorLogg
         log.warning(s"Failed syncing account ${accountInfo}: ${reason}")
         accounts += ((accountInfo, accountData.copy(syncStatus = Synced(blockHeight.value))))
         scheduler.doLater(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncInterval)) {
-          router ! StartSynchronization(accountData.account, accountInfo)
+          synchronizer ! StartSynchronization(accountData.account, accountInfo)
         }
       case scala.util.Failure(_) => // TODO handle this error
     }
@@ -184,7 +184,7 @@ class AccountSynchronizerWatchdog(scheduler: Timer) extends Actor with ActorLogg
         log.debug(s"New status for account ${accountInfo}: ${accounts(accountInfo).syncStatus}")
 
         scheduler.doLater(Duration.fromSeconds(DaemonConfiguration.Synchronization.syncInterval)) {
-          router ! StartSynchronization(accountData.account, accountInfo)
+          synchronizer ! StartSynchronization(accountData.account, accountInfo)
         }
       case scala.util.Failure(_) => // TODO handle this error
     }
@@ -193,7 +193,7 @@ class AccountSynchronizerWatchdog(scheduler: Timer) extends Actor with ActorLogg
   private def registerAccount(wallet: Wallet, account: Account, accountInfo: AccountInfo): Unit = {
     if (!accounts.contains(accountInfo)) {
       accounts += ((accountInfo, AccountData(account = account, wallet = wallet, syncStatus = Synced(0))))
-      router ! StartSynchronization(account, accountInfo)
+      synchronizer ! StartSynchronization(account, accountInfo)
     }
   }
 
@@ -251,6 +251,7 @@ object AccountSynchronizerWatchdog {
 class AccountSynchronizer2 extends Actor with ActorLogging with UnboundedStash {
 
   implicit val ec: ExecutionContext = context.dispatcher
+  var synchronizationTickets: Int = DaemonConfiguration.Synchronization.syncAccountRegisterInterval
 
   override def preStart(): Unit = {
     super.preStart()
@@ -258,36 +259,42 @@ class AccountSynchronizer2 extends Actor with ActorLogging with UnboundedStash {
 
   override val receive: Receive = {
     case StartSynchronization(account, accountInfo) =>
-      context.become({
-        case StartSynchronization(_, _) => stash()
-      })
+      if (synchronizationTickets == 1) {
+        context.become({
+          case any =>
+            log.info(s"[${self.path}]Stashing resync ${any}")
+            stash()
+        }, discardOld = false)
+      }
+      synchronizationTickets -= 1
       sender() ! SyncStarted(accountInfo)
       sync(account, accountInfo).pipeTo(sender())
+        .andThen { case _ =>
+          if (synchronizationTickets == 0) {
+            context.unbecome()
+            unstashAll()
+          }
+          synchronizationTickets += 1
+        }
   }
 
   private def sync(account: Account, accountInfo: AccountInfo): Future[SyncResult] = {
     import co.ledger.wallet.daemon.context.ApplicationContext.IOPool
     val accountUrl: String = s"${accountInfo.poolName}/${accountInfo.walletName}/${account.getIndex}"
 
-    log.info(s"#Sync : start syncing $accountInfo")
+    log.info(s"[${self.path}]#Sync : start syncing $accountInfo")
     account.sync(accountInfo.poolName, accountInfo.walletName)(IOPool)
       .map { result =>
         if (result.syncResult) {
-          log.info(s"#Sync : $accountUrl has been synced : $result")
-          context.unbecome()
-          unstashAll()
+          log.info(s"#[${self.path}]Sync : $accountUrl has been synced : $result")
           SyncSuccess(accountInfo)
         } else {
           log.error(s"#Sync : $accountUrl has FAILED")
-          context.unbecome()
-          unstashAll()
           SyncFailure(accountInfo, s"#Sync : Lib core failed to sync the account $accountUrl")
         }
       }(IOPool)
       .recoverWith { case NonFatal(t) =>
         log.error(t, s"#Sync Failed to sync account: $accountUrl")
-        context.unbecome()
-        unstashAll()
         Future.successful(SyncFailure(accountInfo, t.getMessage))
       }(IOPool)
   }
