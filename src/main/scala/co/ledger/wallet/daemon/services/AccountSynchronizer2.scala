@@ -131,7 +131,7 @@ class AccountSynchronizerWatchdog(scheduler: Timer) extends Actor with ActorLogg
 
   override def preStart(): Unit = {
     super.preStart()
-    synchronizer = context.actorOf(Props(new AccountSynchronizer2()), "synchronizer")
+    synchronizer = context.actorOf(Props(new AccountSynchronizer2(self)), "synchronizer")
   }
 
   override val receive: Receive = {
@@ -248,10 +248,11 @@ object AccountSynchronizerWatchdog {
 
 }
 
-class AccountSynchronizer2 extends Actor with ActorLogging with UnboundedStash {
+class AccountSynchronizer2(watchdog: ActorRef) extends Actor with ActorLogging with UnboundedStash {
 
   implicit val ec: ExecutionContext = context.dispatcher
-  var synchronizationTickets: Int = DaemonConfiguration.Synchronization.syncAccountRegisterInterval
+  var synchronizationTickets: Integer = DaemonConfiguration.Synchronization.maxOnGoing
+  val queue: mutable.Queue[(Account, AccountInfo)] = new mutable.Queue[(Account, AccountInfo)]
 
   override def preStart(): Unit = {
     super.preStart()
@@ -259,23 +260,27 @@ class AccountSynchronizer2 extends Actor with ActorLogging with UnboundedStash {
 
   override val receive: Receive = {
     case StartSynchronization(account, accountInfo) =>
-      if (synchronizationTickets == 1) {
-        context.become({
-          case any =>
-            log.info(s"[${self.path}]Stashing resync ${any}")
-            stash()
-        }, discardOld = false)
+      if (synchronizationTickets == 0) {
+        queue += ((account, accountInfo))
+      } else {
+        synchronizationTickets -= 1
+        sync(account, accountInfo).pipeTo(self)
+        sender() ! SyncStarted(accountInfo)
       }
-      synchronizationTickets -= 1
-      sender() ! SyncStarted(accountInfo)
-      sync(account, accountInfo).pipeTo(sender())
-        .andThen { case _ =>
-          if (synchronizationTickets == 0) {
-            context.unbecome()
-            unstashAll()
-          }
-          synchronizationTickets += 1
-        }
+    case SyncSuccess(accountInfo) =>
+      synchronizationTickets += 1
+      watchdog ! SyncSuccess(accountInfo)
+      if (queue.nonEmpty) {
+        val (account, accountInfo) = queue.dequeue()
+        self ! StartSynchronization(account, accountInfo)
+      }
+    case SyncFailure(accountInfo, reason) =>
+      synchronizationTickets += 1
+      watchdog ! SyncFailure(accountInfo, reason)
+      if (queue.nonEmpty) {
+        val (account, accountInfo) = queue.dequeue()
+        self ! StartSynchronization(account, accountInfo)
+      }
   }
 
   private def sync(account: Account, accountInfo: AccountInfo): Future[SyncResult] = {
@@ -305,6 +310,8 @@ object AccountSynchronizer2 {
   case class StartSynchronization(account: Account, accountInfo: AccountInfo)
 
   case class SyncStarted(accountInfo: AccountInfo)
+
+  case object TryStartNext
 
   sealed trait SyncResult
 
