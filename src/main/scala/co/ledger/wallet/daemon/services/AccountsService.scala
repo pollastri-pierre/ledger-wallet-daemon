@@ -33,7 +33,7 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 
 @Singleton
-class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: AccountSynchronizerManager, poolPublisher: PoolPublisher) extends DaemonService {
+class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: AccountSynchronizerManager2, poolPublisher: PoolPublisher) extends DaemonService {
 
   case class CacheKey(a: AccountInfo, contract: Option[String])
 
@@ -265,7 +265,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
       (w, p) =>
         w.addAccountIfNotExist(accountCreationBody).flatMap { a =>
           val accountInfo = AccountInfo(a.getIndex, walletInfo)
-          synchronizerManager.registerAccount(a, w, accountInfo)
+          synchronizerManager.registerAccount(w, a, accountInfo)
           accountView(p, walletInfo, w)(a).map(_.get)
         }
     }
@@ -275,7 +275,7 @@ class AccountsService @Inject()(daemonCache: DaemonCache, synchronizerManager: A
       (w, p) =>
         w.addAccountIfNotExist(derivations).flatMap { a =>
           val accountInfo = AccountInfo(a.getIndex, walletInfo)
-          synchronizerManager.registerAccount(a, w, accountInfo)
+          synchronizerManager.registerAccount(w, a, accountInfo)
           accountView(p, walletInfo, w)(a).map(_.get)
         }
     }

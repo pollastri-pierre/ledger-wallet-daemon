@@ -10,7 +10,7 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.Future
 
 @Singleton
-class PoolsService @Inject()(daemonCache: DaemonCache, accountSynchronizer: AccountSynchronizerManager) extends DaemonService {
+class PoolsService @Inject()(daemonCache: DaemonCache, accountSynchronizer: AccountSynchronizerManager2) extends DaemonService {
 
   import PoolsService._
 

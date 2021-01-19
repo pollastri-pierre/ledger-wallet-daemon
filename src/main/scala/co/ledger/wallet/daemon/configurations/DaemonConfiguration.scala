@@ -85,6 +85,7 @@ object DaemonConfiguration extends Logging {
     else {
       DEFAULT_SYNC_ACCOUNT_REGISTER_INTERVAL
     }
+    // FIXME: unused?
     val syncStatusCheckInterval: Int = if (config.hasPath("synchronization.sync_status_check_interval_in_seconds")) {
       config.getInt("synchronization.sync_status_check_interval_in_seconds")
     }
@@ -97,8 +98,8 @@ object DaemonConfiguration extends Logging {
     else {
       DEFAULT_RESYNC_CHECK_INTERVAL
     }
-    val maxOnGoing: Int = if (config.hasPath("synchronization.max_ongoing")) {
-      config.getInt("synchronization.max_ongoing")
+    val maxOnGoing: Int = if (config.hasPath("synchronization.sync_ongoing_max")) {
+      config.getInt("synchronization.sync_ongoing_max")
     }
     else {
       DEFAULT_SYNC_ON_GOING

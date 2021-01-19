@@ -3,7 +3,7 @@ package co.ledger.wallet.daemon.modules
 import co.ledger.wallet.daemon.context.ApplicationContext.IOPool
 import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.database.{DaemonCache, DefaultDaemonCache}
-import co.ledger.wallet.daemon.services.AccountSynchronizerManager
+import co.ledger.wallet.daemon.services.AccountSynchronizerManager2
 import com.google.inject.Provides
 import com.twitter.inject.{Injector, TwitterModule}
 import com.twitter.util.Duration
@@ -27,13 +27,13 @@ object DaemonCacheModule extends TwitterModule {
   override def singletonPostWarmupComplete(injector: Injector): Unit = {
     info(s"Core operation pool cpu factor is ${DaemonConfiguration.corePoolOpSizeFactor}")
     Await.result(updateWalletConfig(), 5.minutes)
-    val accountSynchronizerManager = injector.instance[AccountSynchronizerManager](classOf[AccountSynchronizerManager])
+    val accountSynchronizerManager = injector.instance[AccountSynchronizerManager2](classOf[AccountSynchronizerManager2])
     accountSynchronizerManager.start()
   }
 
   override def singletonShutdown(injector: Injector): Unit = {
     info("Shutdown Hook...")
-    injector.instance[AccountSynchronizerManager](classOf[AccountSynchronizerManager]).close(Duration.fromMinutes(3))
+    injector.instance[AccountSynchronizerManager2](classOf[AccountSynchronizerManager2]).close(Duration.fromMinutes(3))
   }
 
   private def updateWalletConfig(): Future[Unit] = {

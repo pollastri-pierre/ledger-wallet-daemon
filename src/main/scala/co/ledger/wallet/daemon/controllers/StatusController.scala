@@ -9,7 +9,7 @@ import co.ledger.wallet.daemon.configurations.DaemonConfiguration
 import co.ledger.wallet.daemon.libledger_core.metrics.LibCoreMetrics
 import co.ledger.wallet.daemon.libledger_core.metrics.LibCoreMetrics.{AllocationMetric, DurationMetric}
 import co.ledger.wallet.daemon.models.AccountInfo
-import co.ledger.wallet.daemon.services.{AccountsService, SyncStatus}
+import co.ledger.wallet.daemon.services.{AccountsService, SyncStatus, Syncing}
 import com.twitter.finagle.http.Request
 import com.twitter.finatra.http.Controller
 import javax.inject.Inject
@@ -44,7 +44,7 @@ class StatusController @Inject()(accountsService: AccountsService) extends Contr
           ClientFactory.httpCoreClient.poolCacheSize,
           ApiClient.fallbackServices.poolCacheSize,
           ApiClient.feeServices.poolCacheSize,
-          ongoingSyncs)
+          OnGoingSyncs(ongoingSyncs.count(_._2.isInstanceOf[Syncing]), ongoingSyncs))
       )
 
   }
@@ -65,7 +65,9 @@ object StatusController {
 
   case class VersionResponse(name: String, version: String, scalaVersion: String, commitHash: String, libcoreVersion: String, explorers: DaemonConfiguration.ExplorerConfig)
 
-  case class MetricsResponse(coreHttpCachedPool: Long, feesHttpCachedPool: Long, fallbackHttpCachedPool: Long, ongoingSyncs: List[(AccountInfo, SyncStatus)])
+  case class MetricsResponse(coreHttpCachedPool: Long, feesHttpCachedPool: Long, fallbackHttpCachedPool: Long, ongoingSyncs: OnGoingSyncs)
 
   case class LibCoreMetricsResponse(allocations: List[AllocationMetric], durations: List[DurationMetric])
+
+  case class OnGoingSyncs(total: Integer, detail: List[(AccountInfo, SyncStatus)])
 }
