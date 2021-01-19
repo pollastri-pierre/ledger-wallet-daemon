@@ -258,7 +258,6 @@ class AccountSynchronizer2 extends Actor with ActorLogging with UnboundedStash {
 
   override val receive: Receive = {
     case StartSynchronization(account, accountInfo) =>
-      unstashAll()
       context.become({
         case StartSynchronization(_, _) => stash()
       })
@@ -276,16 +275,19 @@ class AccountSynchronizer2 extends Actor with ActorLogging with UnboundedStash {
         if (result.syncResult) {
           log.info(s"#Sync : $accountUrl has been synced : $result")
           context.unbecome()
+          unstashAll()
           SyncSuccess(accountInfo)
         } else {
           log.error(s"#Sync : $accountUrl has FAILED")
           context.unbecome()
+          unstashAll()
           SyncFailure(accountInfo, s"#Sync : Lib core failed to sync the account $accountUrl")
         }
       }(IOPool)
       .recoverWith { case NonFatal(t) =>
         log.error(t, s"#Sync Failed to sync account: $accountUrl")
         context.unbecome()
+        unstashAll()
         Future.successful(SyncFailure(accountInfo, t.getMessage))
       }(IOPool)
   }
